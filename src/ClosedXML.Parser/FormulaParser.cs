@@ -411,7 +411,10 @@ public class FormulaParser<TScalarValue, TNode, TContext>
     private TNode RefImplicitExpression(bool replaceFirstAtom = false, TNode? refAtom = default)
     {
         var start = GetStart(replaceFirstAtom);
-        if (_la == Token.INTERSECT)
+
+        // The INTERSECT operator is a prefix operator. When the parser replaces the first atom, the parser
+        // has already read the atom. An INTERSECT token after the atom is not a prefix of it, e.g. `(A1)@`.
+        if (_la == Token.INTERSECT && !replaceFirstAtom)
         {
             Consume();
             var refNode = RefImplicitExpression(replaceFirstAtom, refAtom);
