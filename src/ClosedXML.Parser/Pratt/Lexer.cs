@@ -18,7 +18,8 @@ internal class Lexer
     private readonly Queue<Token> _queue = new(4);
     private string _input = string.Empty; // Currently tokenized formula
     private int _start; // The start index of currently parsed token in Next()
-    private int _i; // Index of current code point _c in _input
+    private int _i; // Index of the first char of current code point _c in _input
+    private int _width; // Number of chars of current code point _c in _input, 2 for a surrogate pair
     private int _c; // A current code point (including astral planes) or -1 if at the EOF
 
 
@@ -50,6 +51,7 @@ internal class Lexer
         _input = formula ?? throw new ArgumentNullException();
         _start = -1;
         _i = -1;
+        _width = 1;
         _c = 0;
     }
 
@@ -407,13 +409,9 @@ internal class Lexer
 
         static bool IsLetterOrLetterMark(int codepoint)
         {
-            // TODO: A code point above U+FFFF is never a letter here. CharUnicodeInfo.GetUnicodeCategory(int) can
-            // give the category of such a code point, but the change must also match the Rolex lexer.
-            if (codepoint > 0xFFFF)
-                return false; // No letters from astral planes for us :(
-
             // Letters are categories from 0 to OtherLetter category. Then there are NonSpacingMark (accents and such).
-            return CharUnicodeInfo.GetUnicodeCategory((char)codepoint) <= UnicodeCategory.NonSpacingMark;
+            // The int overload also gives the category of a code point above U+FFFF.
+            return CharUnicodeInfo.GetUnicodeCategory(codepoint) <= UnicodeCategory.NonSpacingMark;
         }
 
         // Is codepoint a character per XML 1.0 spec (2.2)?
@@ -434,7 +432,9 @@ internal class Lexer
 
     private int Advance()
     {
-        if (++_i >= _input.Length)
+        _i += _width;
+        _width = 1;
+        if (_i >= _input.Length)
         {
             _c = -1;
             return (char)_c;
@@ -450,10 +450,11 @@ internal class Lexer
             if (_i + 1 >= _input.Length)
                 throw ParsingException.UnpairedSurrogate(c, _i);
 
-            var low = _input[++_i];
+            var low = _input[_i + 1];
             if (!char.IsLowSurrogate(low))
-                throw ParsingException.UnpairedSurrogate(c, _i - 1);
+                throw ParsingException.UnpairedSurrogate(c, _i);
 
+            _width = 2;
             _c = char.ConvertToUtf32(c, low);
             return _c;
         }

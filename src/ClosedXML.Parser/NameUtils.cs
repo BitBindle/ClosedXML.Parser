@@ -207,13 +207,15 @@ public static class NameUtils
         // Alert box says:
         // * Starts with a letter or underscore
         // * no space or char that is not allowed
-        if (name[0] != '_' && !char.IsLetter(name[0]))
-            return false;
-
-        foreach (var nextNameChar in name.Slice(1))
+        // A letter above U+FFFF is two chars in UTF-16, thus the method reads runes.
+        var isFirst = true;
+        foreach (var rune in name.EnumerateRunes())
         {
-            if (!char.IsLetter(nextNameChar))
+            var isValid = Rune.IsLetter(rune) || (isFirst && rune.Value == '_');
+            if (!isValid)
                 return false;
+
+            isFirst = false;
         }
 
         return true;
