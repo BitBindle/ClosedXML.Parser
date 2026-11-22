@@ -1,14 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace ClosedXML.Parser;
 
 /// <summary>
 /// A visitor that generates the identical formula for the parsed formula based on passed arguments.
-/// CopyVisitor doesn't make any judgements if passed arguments have been modified. It just makes
-/// a newly allocated copy based on passed values.
+/// CopyVisitor doesn't make any judgements if passed arguments have been modified. When the text of
+/// a node and of all its children is the same as in the original formula, the node is a copy of the
+/// original formula text and no new text is allocated. Otherwise, the node gets a new text.
 /// </summary>
 public class CopyVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, ModContext>
 {
@@ -45,30 +46,8 @@ public class CopyVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, Mod
     /// <inheritdoc />
     public virtual TransformedSymbol ArrayNode(ModContext ctx, SymbolRange range, int rows, int columns, IReadOnlyList<TransformedSymbol> elements)
     {
-        var sb = new StringBuilder(2 + elements.Sum(x => x.Length) + elements.Count);
-        sb.AppendStartFragment(ctx, range, elements[0]);
-        var i = 0;
-        sb.Append(elements[i++].AsSpan());
-        for (var col = 1; col < columns; ++col)
-        {
-            sb.AppendMiddleFragment(ctx, elements[i - 1], elements[i]);
-            sb.Append(elements[i++].AsSpan());
-        }
-
-        for (var row = 1; row < rows; ++row)
-        {
-            sb.AppendMiddleFragment(ctx, elements[i - 1], elements[i]);
-            sb.Append(elements[i++].AsSpan());
-            for (var col = 1; col < columns; ++col)
-            {
-                sb.AppendMiddleFragment(ctx, elements[i - 1], elements[i]);
-                sb.Append(elements[i++].AsSpan());
-            }
-        }
-
-        sb.AppendEndFragment(ctx, range, elements[elements.Count - 1]);
-        var nodeText = sb.ToString();
-        return TransformedSymbol.ToText(ctx.Formula, range, nodeText);
+        // The elements are in the order of the formula text, row by row.
+        return BuildNode(ctx, range, range.Start, ReadOnlySpan<char>.Empty, AsSpan(elements));
     }
 
     /// <inheritdoc />
@@ -106,7 +85,7 @@ public class CopyVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, Mod
     {
         var sb = new StringBuilder(MAX_R1_C1_LEN);
         var nodeText = sb.AppendRef(reference).ToString();
-        return TransformedSymbol.ToText(ctx.Formula, range, nodeText);
+        return ToSymbol(ctx, range, nodeText);
     }
 
     /// <inheritdoc />
@@ -117,7 +96,7 @@ public class CopyVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, Mod
             .AppendSheetReference(sheet)
             .AppendRef(reference)
             .ToString();
-        return TransformedSymbol.ToText(ctx.Formula, range, nodeText);
+        return ToSymbol(ctx, range, nodeText);
     }
 
     /// <inheritdoc />
@@ -128,7 +107,7 @@ public class CopyVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, Mod
             .AppendReferenceSeparator()
             .AppendRef(reference)
             .ToString();
-        return TransformedSymbol.ToText(ctx.Formula, range, nodeText);
+        return ToSymbol(ctx, range, nodeText);
     }
 
     /// <inheritdoc />
@@ -155,7 +134,7 @@ public class CopyVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, Mod
             .AppendReferenceSeparator()
             .AppendRef(reference)
             .ToString();
-        return TransformedSymbol.ToText(ctx.Formula, range, nodeText);
+        return ToSymbol(ctx, range, nodeText);
     }
 
     /// <inheritdoc />
@@ -166,7 +145,7 @@ public class CopyVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, Mod
             .AppendExternalSheetReference(workbookIndex, sheet)
             .AppendRef(reference)
             .ToString();
-        return TransformedSymbol.ToText(ctx.Formula, range, nodeText);
+        return ToSymbol(ctx, range, nodeText);
     }
 
     /// <inheritdoc />
@@ -196,60 +175,53 @@ public class CopyVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, Mod
             .AppendReferenceSeparator()
             .AppendRef(reference)
             .ToString();
-        return TransformedSymbol.ToText(ctx.Formula, range, nodeText);
+        return ToSymbol(ctx, range, nodeText);
     }
 
     /// <inheritdoc />
     public virtual TransformedSymbol Function(ModContext ctx, SymbolRange range, ReadOnlySpan<char> functionName, IReadOnlyList<TransformedSymbol> arguments)
     {
-        var sb = new StringBuilder(functionName.Length + 2 + arguments.Sum(static x => x.Length) + arguments.Count);
-        var nodeText = sb.Append(functionName).AppendArguments(ctx, range, arguments).ToString();
-        return TransformedSymbol.ToText(ctx.Formula, range, nodeText);
+        return BuildFunction(ctx, range, functionName, arguments);
     }
 
     /// <inheritdoc />
     public virtual TransformedSymbol ExternalFunction(ModContext ctx, SymbolRange range, int workbookIndex, ReadOnlySpan<char> functionName, IReadOnlyList<TransformedSymbol> arguments)
     {
-        var sb = new StringBuilder(BOOK_PREFIX_LEN + functionName.Length + 2 + arguments.Sum(static x => x.Length) + arguments.Count);
-        var nodeText = sb
+        var prefix = new StringBuilder(BOOK_PREFIX_LEN + SHEET_SEPARATOR_LEN + functionName.Length)
             .AppendBookIndex(workbookIndex)
             .AppendReferenceSeparator()
-            .AppendFunction(ctx, range, functionName, arguments)
+            .Append(functionName)
             .ToString();
-        return TransformedSymbol.ToText(ctx.Formula, range, nodeText);
+        return BuildFunction(ctx, range, prefix.AsSpan(), arguments);
     }
 
     /// <inheritdoc />
     public virtual TransformedSymbol Function(ModContext ctx, SymbolRange range, string sheetName, ReadOnlySpan<char> functionName, IReadOnlyList<TransformedSymbol> arguments)
     {
-        var sb = new StringBuilder(sheetName.Length + QUOTE_RESERVE + SHEET_SEPARATOR_LEN + functionName.Length + 2 + arguments.Sum(static x => x.Length) + arguments.Count);
-        var nodeText = sb
+        var prefix = new StringBuilder(sheetName.Length + QUOTE_RESERVE + SHEET_SEPARATOR_LEN + functionName.Length)
             .AppendSheetReference(sheetName)
-            .AppendFunction(ctx, range, functionName, arguments)
+            .Append(functionName)
             .ToString();
-        return TransformedSymbol.ToText(ctx.Formula, range, nodeText);
+        return BuildFunction(ctx, range, prefix.AsSpan(), arguments);
     }
 
     /// <inheritdoc />
     public virtual TransformedSymbol ExternalFunction(ModContext ctx, SymbolRange range, int workbookIndex, string sheetName, ReadOnlySpan<char> functionName, IReadOnlyList<TransformedSymbol> arguments)
     {
-        var sb = new StringBuilder(BOOK_PREFIX_LEN + sheetName.Length + QUOTE_RESERVE + SHEET_SEPARATOR_LEN + functionName.Length + 2 + arguments.Sum(static x => x.Length) + arguments.Count);
-        var nodeText = sb
+        var prefix = new StringBuilder(BOOK_PREFIX_LEN + sheetName.Length + QUOTE_RESERVE + SHEET_SEPARATOR_LEN + functionName.Length)
             .AppendExternalSheetReference(workbookIndex, sheetName)
-            .AppendFunction(ctx, range, functionName, arguments)
+            .Append(functionName)
             .ToString();
-        return TransformedSymbol.ToText(ctx.Formula, range, nodeText);
+        return BuildFunction(ctx, range, prefix.AsSpan(), arguments);
     }
 
     /// <inheritdoc />
     public virtual TransformedSymbol CellFunction(ModContext ctx, SymbolRange range, RowCol cell, IReadOnlyList<TransformedSymbol> arguments)
     {
-        var sb = new StringBuilder(MAX_R1_C1_LEN + SHEET_SEPARATOR_LEN + arguments.Sum(static x => x.Length));
-        var nodeText = sb
+        var prefix = new StringBuilder(MAX_R1_C1_LEN)
             .AppendRef(cell)
-            .AppendArguments(ctx, range, arguments)
             .ToString();
-        return TransformedSymbol.ToText(ctx.Formula, range, nodeText);
+        return BuildFunction(ctx, range, prefix.AsSpan(), arguments);
     }
 
     /// <inheritdoc />
@@ -257,7 +229,7 @@ public class CopyVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, Mod
         StructuredReferenceArea area, string? firstColumn, string? lastColumn)
     {
         var nodeText = GetIntraTableReference(area, firstColumn, lastColumn);
-        return TransformedSymbol.ToText(ctx.Formula, range, nodeText);
+        return ToSymbol(ctx, range, nodeText);
     }
 
     /// <inheritdoc />
@@ -265,7 +237,7 @@ public class CopyVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, Mod
         string table, StructuredReferenceArea area, string? firstColumn, string? lastColumn)
     {
         var nodeText = table + GetIntraTableReference(area, firstColumn, lastColumn);
-        return TransformedSymbol.ToText(ctx.Formula, range, nodeText);
+        return ToSymbol(ctx, range, nodeText);
     }
 
     /// <inheritdoc />
@@ -274,10 +246,12 @@ public class CopyVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, Mod
         string? lastColumn)
     {
         var nodeText = new StringBuilder()
-            .AppendBookIndex(workbookIndex).Append(table)
+            .AppendBookIndex(workbookIndex)
+            .AppendReferenceSeparator()
+            .Append(table)
             .Append(GetIntraTableReference(area, firstColumn, lastColumn))
             .ToString();
-        return TransformedSymbol.ToText(ctx.Formula, range, nodeText);
+        return ToSymbol(ctx, range, nodeText);
     }
 
     /// <inheritdoc />
@@ -294,7 +268,7 @@ public class CopyVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, Mod
             .AppendSheetReference(sheet)
             .Append(name)
             .ToString();
-        return TransformedSymbol.ToText(ctx.Formula, range, nodeText);
+        return ToSymbol(ctx, range, nodeText);
     }
 
     /// <inheritdoc />
@@ -305,7 +279,7 @@ public class CopyVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, Mod
             .AppendReferenceSeparator()
             .Append(name)
             .ToString();
-        return TransformedSymbol.ToText(ctx.Formula, range, nodeText);
+        return ToSymbol(ctx, range, nodeText);
     }
 
     /// <inheritdoc />
@@ -317,7 +291,7 @@ public class CopyVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, Mod
             .AppendReferenceSeparator()
             .Append(name)
             .ToString();
-        return TransformedSymbol.ToText(ctx.Formula, range, nodeText);
+        return ToSymbol(ctx, range, nodeText);
     }
 
     /// <inheritdoc />
@@ -328,44 +302,150 @@ public class CopyVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, Mod
             .AppendExternalSheetReference(workbookIndex, sheet)
             .Append(name)
             .ToString();
-        return TransformedSymbol.ToText(ctx.Formula, range, nodeText);
+        return ToSymbol(ctx, range, nodeText);
     }
 
     /// <inheritdoc />
     public virtual TransformedSymbol BinaryNode(ModContext ctx, SymbolRange range, BinaryOperation operation, TransformedSymbol leftNode, TransformedSymbol rightNode)
     {
-        var sb = new StringBuilder(leftNode.Length + rightNode.OriginalRange.Start - leftNode.OriginalRange.End + rightNode.Length)
-            .AppendStartFragment(ctx, range, leftNode)
-            .Append(leftNode.AsSpan())
-            .AppendMiddleFragment(ctx, leftNode, rightNode)
-            .Append(rightNode.AsSpan())
-            .AppendEndFragment(ctx, range, rightNode);
-
-        var nodeText = sb.ToString();
-        return TransformedSymbol.ToText(ctx.Formula, range, nodeText);
+        return BuildNode(ctx, range, range.Start, ReadOnlySpan<char>.Empty, [leftNode, rightNode]);
     }
 
     /// <inheritdoc />
     public virtual TransformedSymbol Unary(ModContext ctx, SymbolRange range, UnaryOperation operation, TransformedSymbol node)
     {
-        var sb = new StringBuilder(node.Length + 1)
-            .AppendStartFragment(ctx, range, node)
-            .Append(node.AsSpan())
-            .AppendEndFragment(ctx, range, node);
-
-        var nodeText = sb.ToString();
-        return TransformedSymbol.ToText(ctx.Formula, range, nodeText);
+        return BuildNode(ctx, range, range.Start, ReadOnlySpan<char>.Empty, [node]);
     }
 
     /// <inheritdoc />
     public virtual TransformedSymbol Nested(ModContext ctx, SymbolRange range, TransformedSymbol node)
     {
-        var nodeText = new StringBuilder(node.Length + 2)
-            .AppendStartFragment(ctx, range, node)
-            .Append(node.AsSpan())
-            .AppendEndFragment(ctx, range, node)
-            .ToString();
-        return TransformedSymbol.ToText(ctx.Formula, range, nodeText);
+        return BuildNode(ctx, range, range.Start, ReadOnlySpan<char>.Empty, [node]);
+    }
+
+    /// <summary>
+    /// Create a symbol for a node text. A text that is the same as the original text of the range
+    /// becomes a copy of the original, so that the parent nodes can also keep the original text.
+    /// </summary>
+    private static TransformedSymbol ToSymbol(ModContext ctx, SymbolRange range, string nodeText)
+    {
+        var original = ctx.Formula.AsSpan(range.Start, range.Length);
+        return original.SequenceEqual(nodeText.AsSpan())
+            ? TransformedSymbol.CopyOriginal(ctx.Formula, range)
+            : TransformedSymbol.ToText(ctx.Formula, range, nodeText);
+    }
+
+    /// <summary>
+    /// Create a symbol for a function: the <paramref name="prefix"/> (for example a sheet and a
+    /// function name), then the braces and the arguments.
+    /// </summary>
+    private static TransformedSymbol BuildFunction(ModContext ctx, SymbolRange range, ReadOnlySpan<char> prefix, IReadOnlyList<TransformedSymbol> arguments)
+    {
+        var nodeStart = arguments.Count == 0 ? range.End : arguments[0].OriginalRange.Start;
+        var braceIdx = StringBuilderExtensions.GetStartBraceIndex(ctx, range, nodeStart);
+        return BuildNode(ctx, range, braceIdx, prefix, AsSpan(arguments));
+    }
+
+    /// <summary>
+    /// Create a symbol for an inner node. The text of the node is the <paramref name="prefix"/>,
+    /// then the original formula text from <paramref name="start"/> to the end of the
+    /// <paramref name="range"/>, where the text of each child replaces the original range of the
+    /// child. When the prefix and all children are the same as the original, the node is a copy
+    /// of the original and nothing is allocated.
+    /// </summary>
+    /// <param name="ctx">The context with the original formula.</param>
+    /// <param name="range">The range of the node in the original formula.</param>
+    /// <param name="start">The index in the original formula where the copied text starts. The text from the start of the range to this index is replaced by the prefix.</param>
+    /// <param name="prefix">The text before the copied text.</param>
+    /// <param name="children">The child symbols, in the order of the formula text.</param>
+    private static TransformedSymbol BuildNode(ModContext ctx, SymbolRange range, int start, ReadOnlySpan<char> prefix, ReadOnlySpan<TransformedSymbol> children)
+    {
+        var formula = ctx.Formula;
+        var isOriginal = prefix.SequenceEqual(formula.AsSpan(range.Start, start - range.Start));
+
+        // The text between the children comes from the original formula. A gap is copied only
+        // when it has a positive length.
+        var length = prefix.Length;
+        var position = start;
+        foreach (var child in children)
+        {
+            var childRange = child.OriginalRange;
+            if (childRange.Start >= position)
+                length += childRange.Start - position;
+            else
+                isOriginal = false;
+
+            length += child.Length;
+            isOriginal &= child.IsOriginalIn(formula);
+            position = childRange.End;
+        }
+
+        if (range.End >= position)
+            length += range.End - position;
+        else
+            isOriginal = false;
+
+        if (isOriginal)
+            return TransformedSymbol.CopyOriginal(formula, range);
+
+        var parts = new NodeParts(formula, start, range.End, prefix, children);
+        var nodeText = string.Create(length, parts, static (text, parts) =>
+        {
+            parts.Prefix.CopyTo(text);
+            text = text.Slice(parts.Prefix.Length);
+            var position = parts.Start;
+            foreach (var child in parts.Children)
+            {
+                var childRange = child.OriginalRange;
+                if (childRange.Start > position)
+                {
+                    var gap = parts.Formula.AsSpan(position, childRange.Start - position);
+                    gap.CopyTo(text);
+                    text = text.Slice(gap.Length);
+                }
+
+                var childText = child.AsSpan();
+                childText.CopyTo(text);
+                text = text.Slice(childText.Length);
+                position = childRange.End;
+            }
+
+            if (parts.End > position)
+                parts.Formula.AsSpan(position, parts.End - position).CopyTo(text);
+        });
+        return TransformedSymbol.ToText(formula, range, nodeText);
+    }
+
+    private static ReadOnlySpan<TransformedSymbol> AsSpan(IReadOnlyList<TransformedSymbol> symbols)
+    {
+        return symbols switch
+        {
+            TransformedSymbol[] array => array,
+            List<TransformedSymbol> list => CollectionsMarshal.AsSpan(list),
+            _ => ToArray(symbols),
+        };
+
+        static TransformedSymbol[] ToArray(IReadOnlyList<TransformedSymbol> symbols)
+        {
+            var array = new TransformedSymbol[symbols.Count];
+            for (var i = 0; i < array.Length; ++i)
+                array[i] = symbols[i];
+
+            return array;
+        }
+    }
+
+    private readonly ref struct NodeParts(string formula, int start, int end, ReadOnlySpan<char> prefix, ReadOnlySpan<TransformedSymbol> children)
+    {
+        public string Formula { get; } = formula;
+
+        public int Start { get; } = start;
+
+        public int End { get; } = end;
+
+        public ReadOnlySpan<char> Prefix { get; } = prefix;
+
+        public ReadOnlySpan<TransformedSymbol> Children { get; } = children;
     }
 
     private static string GetIntraTableReference(StructuredReferenceArea area, string? firstColumn, string? lastColumn)
