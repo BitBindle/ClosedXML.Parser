@@ -26,7 +26,7 @@ internal class Parser<T, TContext>
         // Each token must be a part of the expression.
         var nextToken = _lexer.Peek();
         if (nextToken.Type != TokenType.Eof)
-            throw new ParsingException($"The formula `{formula}` wasn't parsed correctly. The expression `{formula.AsSpan(node.Range.Start, node.Range.Length)}` was parsed, but the rest `{formula.AsSpan(nextToken.Range.Start, trimmedLength - nextToken.Range.Start)}` wasn't.");
+            throw new ParsingException($"The formula `{formula}` was not parsed correctly. The expression `{formula.AsSpan(node.Range.Start, node.Range.Length)}` was parsed, but the rest `{formula.AsSpan(nextToken.Range.Start, trimmedLength - nextToken.Range.Start)}` was not.");
 
         return node.Value;
     }

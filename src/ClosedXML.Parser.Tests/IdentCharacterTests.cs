@@ -64,10 +64,30 @@ public class IdentCharacterTests
     [InlineData("\uFFFD!A1")] // The last valid char in the basic multilingual plane
     [InlineData("\U0001F600!A1")]
     [InlineData("TRUE!A1")]
+    [InlineData("Sheet! A1")] // The sheet prefix of the main lexer contains the spaces after the `!`
+    [InlineData("\nSheet!A1")]
     [InlineData("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!A1")] // The main parser does not check the length
     public void Both_parsers_read_unquoted_sheet(string formula)
     {
         AssertSameNode<SheetReferenceNode>(formula);
+    }
+
+    [Theory]
+    [Trait("Issue", "16")]
+    [InlineData("1+\nSheet!A1")] // The main lexer adds the LF to the operator, not to the sheet name
+    [InlineData("1+\rSheet!A1")]
+    [InlineData("1- \r\nSheet!A1")]
+    [InlineData("1*\n\n1x!A1")]
+    [InlineData("1/\nSheet!A1")]
+    [InlineData("2^\nSheet!A1")]
+    [InlineData("(\nSheet!A1)")]
+    [InlineData("1+\tSheet!A1")] // The main lexer does not add a tab to the operator
+    public void Both_parsers_read_sheet_after_operator(string formula)
+    {
+        var mainNode = ParseMain(formula);
+        var prattNode = ParsePratt(formula);
+
+        Assert.Equal(mainNode, prattNode);
     }
 
     [Theory]
@@ -120,7 +140,7 @@ public class IdentCharacterTests
 
     [Fact]
     [Trait("Issue", "16")]
-    public void Lexer_reads_each_char_of_sheet_run_once()
+    public void Lexer_reads_tokens_in_sheet_run_without_bang()
     {
         // The chars after `a` are a run of sheet name chars without `!`. The lexer must read
         // the same tokens as before: ident, semicolon, ident.
@@ -199,7 +219,7 @@ public class IdentCharacterTests
     [Trait("Issue", "16")]
     [InlineData("(", "Unexpected token")]
     [InlineData("1+", "Unexpected token")]
-    [InlineData("x)", "wasn't parsed correctly")]
+    [InlineData("x)", "was not parsed correctly")]
     public void Pratt_parser_throws_parsing_exception_for_invalid_formula(string formula, string expectedMessage)
     {
         var parser = ParserFactory.Create(new F());

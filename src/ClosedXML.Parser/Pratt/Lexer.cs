@@ -241,7 +241,7 @@ internal class Lexer
             if (next == '=')
                 return FoundToken(TokenType.LessEqual);
 
-            return T(TokenType.Less);
+            return OperatorToken(TokenType.Less);
         }
 
         if (_c == '>')
@@ -251,7 +251,7 @@ internal class Lexer
                 return FoundToken(TokenType.GreaterEqual);
             }
 
-            return T(TokenType.Greater);
+            return OperatorToken(TokenType.Greater);
         }
 
         if (IsWhitespace(_c))
@@ -298,7 +298,7 @@ internal class Lexer
                     }
             }
 
-            return T(TokenType.Spill);
+            return OperatorToken(TokenType.Spill);
         }
 
         if (_c == '[')
@@ -404,6 +404,17 @@ internal class Lexer
         Token FoundToken(TokenType type)
         {
             Advance();
+            return OperatorToken(type);
+        }
+
+        // The operator ends before the current char. The main lexer adds spaces, CRs and LFs after
+        // an operator (and after the '!' of a sheet prefix) to the operator token, thus the next
+        // token can not start with them, e.g. `1+\nSheet!A1` has the sheet `Sheet`.
+        Token OperatorToken(TokenType type)
+        {
+            while (_c is ' ' or '\r' or '\n')
+                Advance();
+
             return T(type);
         }
 
