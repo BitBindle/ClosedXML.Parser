@@ -12,6 +12,8 @@ internal class RolexLexer
     /// </summary>
     private const int UnpairedSurrogate = -1;
 
+    private const int MaxInitialCapacity = 256;
+
     /// <summary>
     /// Get all tokens for a formula. Use A1 semantic. If there is an error, add token with an error symbol at the end or EOF token at the end.
     /// </summary>
@@ -32,7 +34,7 @@ internal class RolexLexer
 
     private static List<Token> GetTokens(ReadOnlySpan<char> formula, DfaEntry[] lexerDfa)
     {
-        var tokens = new List<Token>();
+        var tokens = new List<Token>(GetInitialCapacity(formula.Length));
         for (var i = 0; i < formula.Length;)
         {
             var (symbolId, length) = GetToken(formula, i, lexerDfa);
@@ -47,6 +49,16 @@ internal class RolexLexer
 
         tokens.Add(Token.EofSymbol(formula.Length));
         return tokens;
+    }
+
+    /// <summary>
+    /// Estimate the number of tokens, so that the list does not grow for most formulas. In the
+    /// Enron and EUSES formulas, a token has 2.9 chars on average and the half of the formula
+    /// length is sufficient for 92 % of formulas. The cap limits the memory for long formulas.
+    /// </summary>
+    private static int GetInitialCapacity(int formulaLength)
+    {
+        return Math.Min(formulaLength / 2 + 1, MaxInitialCapacity);
     }
 
     /// <summary>

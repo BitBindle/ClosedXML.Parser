@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Text;
 
 namespace ClosedXML.Parser;
 
@@ -76,11 +75,7 @@ public readonly struct TransformedSymbol
         if (append.Length == 0 && _transformedText is not null)
             return _transformedText;
 
-        var text = AsSpan();
-        return new StringBuilder(text.Length + append.Length)
-            .Append(text)
-            .Append(append)
-            .ToString();
+        return string.Concat(AsSpan(), append);
     }
 
     /// <summary>

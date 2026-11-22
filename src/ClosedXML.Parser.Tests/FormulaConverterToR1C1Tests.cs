@@ -252,4 +252,15 @@ public class FormulaConverterToR1C1Tests
     {
         Assert.Equal(r1c1, FormulaConverter.ToR1C1(a1, row, col));
     }
+
+    [Theory]
+    [Trait("Issue", "21")]
+    [InlineData("SUM(  A1  ,B2,\nC3 ) \n", 1, 1, "SUM(  RC  ,R[1]C[1],\nR[2]C[2] ) \n")]
+    [InlineData("IF(A1,SUM( B1 ),)", 1, 1, "IF(RC,SUM( RC[1] ),)")]
+    [InlineData("SUM(A1,B1)\u00A0\u2003", 1, 1, "SUM(RC,RC[1])\u00A0\u2003")]
+    public void Text_around_arguments_and_whitespace_at_end_stay_same(string a1, int row, int col, string r1c1)
+    {
+        // Only the references change. The converter copies the other text from the original formula.
+        Assert.Equal(r1c1, FormulaConverter.ToR1C1(a1, row, col));
+    }
 }

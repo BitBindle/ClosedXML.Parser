@@ -72,9 +72,8 @@ public static class FormulaConverter
     {
         // Because of intersection operator, we trim the whitespaces at the end before sending
         // formula to the parser. Add them back, if necessary.
-        var trimmed = originalFormula.TrimEnd();
-        var endLength = originalFormula.Length - trimmed.Length;
-        var trimmedEnd = originalFormula.AsSpan().Slice(trimmed.Length, endLength);
+        var trimmedLength = originalFormula.AsSpan().TrimEnd().Length;
+        var trimmedEnd = originalFormula.AsSpan(trimmedLength);
         return transformedFormula.ToString(trimmedEnd);
     }
 
