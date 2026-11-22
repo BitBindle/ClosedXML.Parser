@@ -1,11 +1,17 @@
 ﻿using System.Collections.Generic;
-using System.IO;
 using System;
 
 namespace ClosedXML.Parser.Rolex;
 
 internal class RolexLexer
 {
+    /// <summary>
+    /// A value for an unpaired surrogate. No DFA transition accepts a negative value, thus the
+    /// lexer gives an error token. The DFA tables accept the surrogate range U+D800..U+DFFF as a
+    /// part of a name, so the lexer must not give the surrogate itself to the DFA.
+    /// </summary>
+    private const int UnpairedSurrogate = -1;
+
     /// <summary>
     /// Get all tokens for a formula. Use A1 semantic. If there is an error, add token with an error symbol at the end or EOF token at the end.
     /// </summary>
@@ -43,20 +49,24 @@ internal class RolexLexer
         return tokens;
     }
 
+    /// <summary>
+    /// Read the code point at <paramref name="index"/> and move the index after it.
+    /// </summary>
+    /// <returns>The code point, or <see cref="UnpairedSurrogate"/> for a surrogate that is not part of a pair.</returns>
     private static int Next(ReadOnlySpan<char> input, ref int index)
     {
-        var c = input[index];
+        var c = input[index++];
         if (char.IsHighSurrogate(c))
         {
-            if (index >= input.Length)
-                throw new IOException("Unexpected end of input while looking for Unicode low surrogate.");
+            if (index < input.Length && char.IsLowSurrogate(input[index]))
+                return char.ConvertToUtf32(c, input[index++]);
 
-            var lowSurrogate = input[index + 1];
-            index += 2;
-            return char.ConvertToUtf32(c, lowSurrogate);
+            return UnpairedSurrogate;
         }
 
-        ++index;
+        if (char.IsLowSurrogate(c))
+            return UnpairedSurrogate;
+
         return c;
     }
 
