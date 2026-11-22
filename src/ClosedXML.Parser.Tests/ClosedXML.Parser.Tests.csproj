@@ -20,7 +20,6 @@
   <ItemGroup>
     <ProjectReference Include="..\ClosedXML.ANTLR\ClosedXML.ANTLR.csproj" />
     <ProjectReference Include="..\ClosedXML.Parser.Ast\ClosedXML.Parser.Ast.csproj" />
-    <ProjectReference Include="..\ClosedXML.Parser.Function\ClosedXML.Parser.Function.csproj" />
   </ItemGroup>
 
   <ItemGroup>

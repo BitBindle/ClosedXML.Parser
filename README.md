@@ -11,14 +11,6 @@ Official source for the grammar is [MS-XML](https://learn.microsoft.com/en-us/op
   * `FormulaParser<TScalarValue, TNode>.CellFormulaA1("Sum(A1, 2)", astFactory)`
   * `FormulaParser<TScalarValue, TNode>.CellFormulaR1C1("Sum(R1C1, 2)", astFactory)`
 
-## Visualizer
-There is a visualizer to display AST in a browser at **[https://parser.closedxml.io](https://parser.closedxml.io)**
-
-The `ClosedXML.Parser.Function` project is the Azure function of the visualizer. It uses the isolated worker model on .NET 10.
-The function app and the `local.settings.json` file must set `FUNCTIONS_WORKER_RUNTIME` to `dotnet-isolated`.
-
-![image](https://github.com/ClosedXML/ClosedXML.Parser/assets/7634052/4beaab23-4599-44d4-be7b-705178b69f99)
-
 # Goals
 
 * __Performance__ - ClosedXML needs to parse formula really fast. Limit allocation and so on.
@@ -100,7 +92,6 @@ Generate a DFA through Rolex
 # TODO
 
 * Lexer generation during build
-* Deployment of the Azure function and the web page from CI.
 * Fuzzer
 * PR to Rolex to fix unicode bug.
 

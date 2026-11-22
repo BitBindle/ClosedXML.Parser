@@ -170,7 +170,7 @@ public class F : IAstFactory<ScalarValue, AstNode, Ctx>
 
     public AstNode Nested(Ctx _, SymbolRange range, AstNode node)
     {
-        // AST is mostly there for testing and visualization, so omit the unnecessary nodes in a tree.
+        // The tree shape gives the precedence, so a node for the parentheses adds no data.
         return node;
     }
 }
