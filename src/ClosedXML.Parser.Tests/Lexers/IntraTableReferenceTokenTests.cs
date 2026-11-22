@@ -69,6 +69,12 @@ public class IntraTableReferenceTokenTests
             yield return new object?[] { "[[#Headers],[#Data],[First]:Last]", StructuredReferenceArea.Headers | StructuredReferenceArea.Data, "First", "Last" };
             yield return new object?[] { "[[#Headers],[#Data],First:[Last]]", StructuredReferenceArea.Headers | StructuredReferenceArea.Data, "First", "Last" };
 
+            // fragment INNER_REFERENCE : KEYWORD_LIST
+            // where the end bracket follows the keywords without a column
+            yield return new object?[] { "[[#All]]", StructuredReferenceArea.All, "", "" };
+            yield return new object?[] { "[[#Data],[#Totals]]", StructuredReferenceArea.Data | StructuredReferenceArea.Totals, "", "" };
+            yield return new object?[] { "[ [#Headers] , [#Data] ]", StructuredReferenceArea.Headers | StructuredReferenceArea.Data, "", "" };
+
             // spaces are ignored
             yield return new object?[] { "[  [#Headers]  ,  [#Data]  ,  [First col]:[Last col]  ]", StructuredReferenceArea.Headers | StructuredReferenceArea.Data, "First col", "Last col" };
         }
