@@ -9,9 +9,9 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/ClosedXML.Parser/bin/Debug/net7.0/AntlrCSharp.dll",
+            "program": "${workspaceFolder}/ClosedXML.ANTLR/bin/Debug/net10.0/ClosedXML.ANTLR.dll",
             "args": [],
-            "cwd": "${workspaceFolder}/ClosedXML.Parser",
+            "cwd": "${workspaceFolder}/ClosedXML.ANTLR",
             "console": "integratedTerminal",
             "stopAtEntry": false
         },
@@ -20,7 +20,7 @@
             "type": "antlr-debug",
             "request": "launch",
             "input": "${workspaceFolder}/debug-input.txt",
-            "grammar": "${workspaceFolder}/ClosedXML.Parser/Formula.g4",
+            "grammar": "${workspaceFolder}/ClosedXML.ANTLR/FormulaParser.g4",
             "startRule": "formula",
             "printParseTree": true,
             "visualParseTree": true
