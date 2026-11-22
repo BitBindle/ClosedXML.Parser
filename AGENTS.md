@@ -13,8 +13,6 @@ ClosedXML.Parser is a .NET library that parses Excel formulas into an abstract s
 | `ClosedXML.Parser.Ast` | AST nodes and an AST factory. The tests use them. |
 | `ClosedXML.ANTLR` | The ANTLR grammar of the lexer and the parser, and a console application for manual experiments. |
 | `ClosedXML.Parser.Tests` | xUnit tests. |
-| `ClosedXML.Parser.Function` | Azure function for the AST visualizer. It uses the isolated worker model. |
-| `ClosedXML.Parser.Web` | Static web page of the AST visualizer. It is not a .NET project. |
 
 The projects are in the `src` folder. All .NET projects target `net10.0`.
 `Directory.Build.props` holds the shared project settings.

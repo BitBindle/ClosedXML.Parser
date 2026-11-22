@@ -10,7 +10,6 @@
   </Folder>
   <Project Path="src/ClosedXML.ANTLR/ClosedXML.ANTLR.csproj" />
   <Project Path="src/ClosedXML.Parser.Ast/ClosedXML.Parser.Ast.csproj" />
-  <Project Path="src/ClosedXML.Parser.Function/ClosedXML.Parser.Function.csproj" />
   <Project Path="src/ClosedXML.Parser.Tests/ClosedXML.Parser.Tests.csproj" />
   <Project Path="src/ClosedXML.Parser/ClosedXML.Parser.csproj" />
 </Solution>
