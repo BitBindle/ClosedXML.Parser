@@ -6,3 +6,4 @@ obj
 packages
 .antlr
 .vs
+test-results
