@@ -161,13 +161,13 @@ public class RefModVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, M
     /// <inheritdoc />
     public TransformedSymbol ExternalReference3D(ModContext ctx, SymbolRange range, int workbookIndex, ReadOnlySpan<char> firstSheet, ReadOnlySpan<char> lastSheet, ReferenceArea reference)
     {
-        var modifiedFirstSheet = ModifySheet(ctx, firstSheet);
-        var modifiedLastSheet = ModifySheet(ctx, lastSheet);
+        // The sheets are in another workbook, so they do not change, the same as in
+        // ExternalSheetReference.
         var modifiedReference = ModifyRef(ctx, reference);
-        if (modifiedFirstSheet.IsEmpty || modifiedLastSheet.IsEmpty || modifiedReference is null)
+        if (modifiedReference is null)
             return TransformedSymbol.ToText(ctx.Formula, range, REF_ERROR);
 
-        return s_copyVisitor.ExternalReference3D(ctx, range, workbookIndex, modifiedFirstSheet, modifiedLastSheet, modifiedReference.Value);
+        return s_copyVisitor.ExternalReference3D(ctx, range, workbookIndex, firstSheet, lastSheet, modifiedReference.Value);
     }
 
     /// <inheritdoc />
@@ -293,7 +293,8 @@ public class RefModVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, M
     }
 
     /// <summary>
-    /// An extension to modify sheet name, e.g. rename.
+    /// Modify the name of a sheet, for example to rename it. The visitor calls it only for sheets
+    /// of the workbook of the formula. Sheets of other workbooks do not change.
     /// </summary>
     /// <param name="ctx">The transformation context.</param>
     /// <param name="sheetName">Original sheet name, unescaped. The span is valid only during the call.</param>

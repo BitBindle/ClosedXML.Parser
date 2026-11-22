@@ -87,6 +87,31 @@ public class RefModVisitorTests
     }
 
     [Theory]
+    [Trait("Issue", "31")]
+    [InlineData("[1]Old:Other!A1", "Old", "New")]
+    [InlineData("[1]Old:Other!A1", "Other", "New")]
+    [InlineData("[1]Old:Other!A1", "Old", null)]
+    [InlineData("'[1]Old sheet:Other'!A1", "Old sheet", "New")]
+    [InlineData("SUM([2]First:Last!B2:C3)", "Last", null)]
+    public void ExternalReference3D_keeps_sheets_of_other_workbook(string formula, string oldSheetName, string? newSheetName)
+    {
+        // The map changes a local sheet, not the sheet with the same name in another workbook.
+        var factory = new FormulaVisitor { SheetMap = { { oldSheetName, newSheetName } } };
+        AssertChangesA1(formula, factory, formula);
+    }
+
+    [Theory]
+    [Trait("Issue", "31")]
+    [InlineData("[1]Old:Other!B2", "B2", "D4", "[1]Old:Other!D4")]
+    [InlineData("'[1]Old sheet:Other'!B2", "B2", "D4", "'[1]Old sheet:Other'!D4")]
+    [InlineData("[1]Old:Other!B2", "B2", null, "#REF!")]
+    public void ExternalReference3D_modifies_reference(string formula, string reference, string? replacement, string modifiedFormula)
+    {
+        var factory = new ShiftReferenceVisitor { ReferenceMap = { { reference, replacement } } };
+        AssertChangesA1(formula, factory, modifiedFormula);
+    }
+
+    [Theory]
     [InlineData("Sheet!Name", "Sheet", null, "#REF!")]
     [InlineData("Sheet!Name", "Sheet", "New Sheet", "'New Sheet'!Name")]
     public void SheetName_can_modify_sheet(string formula, string oldSheetName, string? newSheetName, string modifiedFormula)
