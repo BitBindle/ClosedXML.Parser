@@ -142,8 +142,7 @@ public class IdentCharacterTests
     [Trait("Issue", "16")]
     public void Lexer_reads_tokens_in_sheet_run_without_bang()
     {
-        // The chars after `a` are a run of sheet name chars without `!`. The lexer must read
-        // the same tokens as before: ident, semicolon, ident.
+        // A run of sheet name chars without `!` gives the usual tokens: ident, semicolon, ident.
         const string formula = "a;b;c";
         var lexer = new Lexer(formula);
 
@@ -220,6 +219,7 @@ public class IdentCharacterTests
     [InlineData("(", "Unexpected token")]
     [InlineData("1+", "Unexpected token")]
     [InlineData("x)", "was not parsed correctly")]
+    [InlineData("(1", "Expected token of type RightParen")]
     public void Pratt_parser_throws_parsing_exception_for_invalid_formula(string formula, string expectedMessage)
     {
         var parser = ParserFactory.Create(new F());

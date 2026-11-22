@@ -75,7 +75,7 @@ internal class Parser<T, TContext>
     {
         var token = _lexer.Consume();
         if (token.Type != expectedType)
-            throw new InvalidOperationException($"Expected token of type {expectedType}, but received {token.Type}.");
+            throw new ParsingException($"Expected token of type {expectedType}, but received {token.Type} at position {token.Range.Start}.");
 
         return token;
     }
