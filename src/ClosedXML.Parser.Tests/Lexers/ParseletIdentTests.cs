@@ -94,6 +94,26 @@ public class ParseletIdentTests
     }
 
     [Theory]
+    [Trait("Issue", "7")]
+    [InlineData("\U0001D400", typeof(NameNode))] // MATHEMATICAL BOLD CAPITAL A
+    [InlineData("\U0001D400name", typeof(NameNode))]
+    [InlineData("name\U0001D400", typeof(NameNode))]
+    [InlineData("\U00020000name", typeof(NameNode))] // CJK UNIFIED IDEOGRAPH-20000
+    [InlineData("Sheet!\U0001D400", typeof(SheetNameNode))]
+    public void Can_parse_ident_with_letter_above_basic_multilingual_plane(string formula, Type expectedNodeType)
+    {
+        var parser = ParserFactory.Create(new F());
+        var root = parser.ParseFormula(formula, new Ctx());
+
+        Assert.Equal(expectedNodeType, root.GetType());
+        Assert.Equal(formula, root.GetDisplayString(A1));
+
+        // The main parser, which uses the Rolex lexer, gives the same node.
+        var mainParserRoot = FormulaParser<ScalarValue, AstNode, Ctx>.CellFormulaA1(formula, new Ctx(), new F());
+        Assert.Equal(mainParserRoot, root);
+    }
+
+    [Theory]
     [InlineData("TRUE", true)]
     [InlineData("true", true)]
     [InlineData("FALSE", false)]

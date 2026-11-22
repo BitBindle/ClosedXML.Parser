@@ -312,6 +312,32 @@ public class LexerTests
         AssertToken(TokenType.Whitespace, input);
     }
 
+    [Fact]
+    [Trait("Issue", "7")]
+    public void Tokens_next_to_code_point_above_basic_multilingual_plane_have_correct_range()
+    {
+        // MATHEMATICAL BOLD CAPITAL A (U+1D400) is a letter. In UTF-16, it is two chars.
+        const string input = "1+\U0001D400name&\U0001D400";
+        var expectedTokens = new (TokenType Type, int Start, int End)[]
+        {
+            (TokenType.Number, 0, 1),
+            (TokenType.Plus, 1, 2),
+            (TokenType.Ident, 2, 8),
+            (TokenType.Concat, 8, 9),
+            (TokenType.Ident, 9, 11),
+        };
+
+        var lexer = new Lexer(input);
+        foreach (var (type, start, end) in expectedTokens)
+        {
+            var token = lexer.Consume();
+            Assert.Equal(type, token.Type);
+            Assert.Equal(new SymbolRange(start, end), token.Range);
+        }
+
+        Assert.Equal(TokenType.Eof, lexer.Consume().Type);
+    }
+
     private static void AssertToken(TokenType type, string input)
     {
         var lexer = new Lexer(input);
