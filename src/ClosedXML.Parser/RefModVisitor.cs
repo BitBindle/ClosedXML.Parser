@@ -27,7 +27,7 @@ public class RefModVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, M
     }
 
     /// <inheritdoc />
-    public TransformedSymbol TextValue(ModContext ctx, SymbolRange range, string text)
+    public TransformedSymbol TextValue(ModContext ctx, SymbolRange range, ReadOnlySpan<char> text)
     {
         return s_copyVisitor.TextValue(ctx, range, text);
     }
@@ -75,8 +75,16 @@ public class RefModVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, M
         }
 
         // Sheet!#REF! is a valid formula per grammar and Excel, though it displeases me.
-        var sheet = symbol.Slice(0, symbol.Length - REF_ERROR.Length - 1);
-        var modifiedSheet = ModifySheet(ctx, sheet.ToString());
+        // The sheet prefix can be in quotes and can have a workbook index, so parse it.
+        var sheetPrefix = symbol.Slice(0, symbol.Length - REF_ERROR.Length);
+        TokenParser.ParseSingleSheetPrefix(sheetPrefix, out var workbookIndex, out var sheet);
+        if (workbookIndex is not null)
+        {
+            // A sheet of another workbook does not change, the same as in other external references.
+            return TransformedSymbol.CopyOriginal(ctx.Formula, range);
+        }
+
+        var modifiedSheet = ModifySheet(ctx, sheet);
         var nodeText = new StringBuilder()
             .AppendSheetReference(modifiedSheet)
             .Append(symbol.Slice(symbol.Length - REF_ERROR.Length))
@@ -91,7 +99,7 @@ public class RefModVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, M
     }
 
     /// <inheritdoc />
-    public TransformedSymbol TextNode(ModContext ctx, SymbolRange range, string text)
+    public TransformedSymbol TextNode(ModContext ctx, SymbolRange range, ReadOnlySpan<char> text)
     {
         return s_copyVisitor.TextNode(ctx, range, text);
     }
@@ -107,11 +115,11 @@ public class RefModVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, M
     }
 
     /// <inheritdoc />
-    public TransformedSymbol SheetReference(ModContext ctx, SymbolRange range, string sheet, ReferenceArea reference)
+    public TransformedSymbol SheetReference(ModContext ctx, SymbolRange range, ReadOnlySpan<char> sheet, ReferenceArea reference)
     {
         var modifiedSheet = ModifySheet(ctx, sheet);
         var modifiedReference = ModifyRef(ctx, reference);
-        if (modifiedSheet is null || modifiedReference is null)
+        if (modifiedSheet.IsEmpty || modifiedReference is null)
             return TransformedSymbol.ToText(ctx.Formula, range, REF_ERROR);
 
         return s_copyVisitor.SheetReference(ctx, range, modifiedSheet, modifiedReference.Value);
@@ -128,19 +136,19 @@ public class RefModVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, M
     }
 
     /// <inheritdoc />
-    public TransformedSymbol Reference3D(ModContext ctx, SymbolRange range, string firstSheet, string lastSheet, ReferenceArea reference)
+    public TransformedSymbol Reference3D(ModContext ctx, SymbolRange range, ReadOnlySpan<char> firstSheet, ReadOnlySpan<char> lastSheet, ReferenceArea reference)
     {
         var modifiedFirstSheet = ModifySheet(ctx, firstSheet);
         var modifiedLastSheet = ModifySheet(ctx, lastSheet);
         var modifiedReference = ModifyRef(ctx, reference);
-        if (modifiedFirstSheet is null || modifiedLastSheet is null || modifiedReference is null)
+        if (modifiedFirstSheet.IsEmpty || modifiedLastSheet.IsEmpty || modifiedReference is null)
             return TransformedSymbol.ToText(ctx.Formula, range, REF_ERROR);
 
         return s_copyVisitor.Reference3D(ctx, range, modifiedFirstSheet, modifiedLastSheet, modifiedReference.Value);
     }
 
     /// <inheritdoc />
-    public TransformedSymbol ExternalSheetReference(ModContext ctx, SymbolRange range, int workbookIndex, string sheet, ReferenceArea reference)
+    public TransformedSymbol ExternalSheetReference(ModContext ctx, SymbolRange range, int workbookIndex, ReadOnlySpan<char> sheet, ReferenceArea reference)
     {
         var modifiedReference = ModifyRef(ctx, reference);
         if (modifiedReference is null)
@@ -150,12 +158,12 @@ public class RefModVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, M
     }
 
     /// <inheritdoc />
-    public TransformedSymbol ExternalReference3D(ModContext ctx, SymbolRange range, int workbookIndex, string firstSheet, string lastSheet, ReferenceArea reference)
+    public TransformedSymbol ExternalReference3D(ModContext ctx, SymbolRange range, int workbookIndex, ReadOnlySpan<char> firstSheet, ReadOnlySpan<char> lastSheet, ReferenceArea reference)
     {
         var modifiedFirstSheet = ModifySheet(ctx, firstSheet);
         var modifiedLastSheet = ModifySheet(ctx, lastSheet);
         var modifiedReference = ModifyRef(ctx, reference);
-        if (modifiedFirstSheet is null || modifiedLastSheet is null || modifiedReference is null)
+        if (modifiedFirstSheet.IsEmpty || modifiedLastSheet.IsEmpty || modifiedReference is null)
             return TransformedSymbol.ToText(ctx.Formula, range, REF_ERROR);
 
         return s_copyVisitor.ExternalReference3D(ctx, range, workbookIndex, modifiedFirstSheet, modifiedLastSheet, modifiedReference.Value);
@@ -169,17 +177,17 @@ public class RefModVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, M
     }
 
     /// <inheritdoc />
-    public TransformedSymbol Function(ModContext ctx, SymbolRange range, string sheetName, ReadOnlySpan<char> functionName, IReadOnlyList<TransformedSymbol> arguments)
+    public TransformedSymbol Function(ModContext ctx, SymbolRange range, ReadOnlySpan<char> sheetName, ReadOnlySpan<char> functionName, IReadOnlyList<TransformedSymbol> arguments)
     {
         var modifiedSheet = ModifySheet(ctx, sheetName);
-        if (modifiedSheet is null)
+        if (modifiedSheet.IsEmpty)
             return TransformedSymbol.ToText(ctx.Formula, range, REF_ERROR);
 
         return s_copyVisitor.Function(ctx, range, modifiedSheet, functionName, arguments);
     }
 
     /// <inheritdoc />
-    public TransformedSymbol ExternalFunction(ModContext ctx, SymbolRange range, int workbookIndex, string sheetName, ReadOnlySpan<char> functionName, IReadOnlyList<TransformedSymbol> arguments)
+    public TransformedSymbol ExternalFunction(ModContext ctx, SymbolRange range, int workbookIndex, ReadOnlySpan<char> sheetName, ReadOnlySpan<char> functionName, IReadOnlyList<TransformedSymbol> arguments)
     {
         return s_copyVisitor.ExternalFunction(ctx, range, workbookIndex, sheetName, functionName, arguments);
     }
@@ -210,57 +218,57 @@ public class RefModVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, M
     }
 
     /// <inheritdoc />
-    public TransformedSymbol StructureReference(ModContext ctx, SymbolRange range, StructuredReferenceArea area, string? firstColumn, string? lastColumn)
+    public TransformedSymbol StructureReference(ModContext ctx, SymbolRange range, StructuredReferenceArea area, ReadOnlySpan<char> firstColumn, ReadOnlySpan<char> lastColumn)
     {
         return s_copyVisitor.StructureReference(ctx, range, area, firstColumn, lastColumn);
     }
 
     /// <inheritdoc />
-    public TransformedSymbol StructureReference(ModContext ctx, SymbolRange range, string table, StructuredReferenceArea area, string? firstColumn, string? lastColumn)
+    public TransformedSymbol StructureReference(ModContext ctx, SymbolRange range, ReadOnlySpan<char> table, StructuredReferenceArea area, ReadOnlySpan<char> firstColumn, ReadOnlySpan<char> lastColumn)
     {
         var modifiedTableName = ModifyTable(ctx, table);
-        if (modifiedTableName is null)
+        if (modifiedTableName.IsEmpty)
             return TransformedSymbol.ToText(ctx.Formula, range, REF_ERROR);
 
         return s_copyVisitor.StructureReference(ctx, range, modifiedTableName, area, firstColumn, lastColumn);
     }
 
     /// <inheritdoc />
-    public TransformedSymbol ExternalStructureReference(ModContext ctx, SymbolRange range, int workbookIndex, string table, StructuredReferenceArea area, string? firstColumn, string? lastColumn)
+    public TransformedSymbol ExternalStructureReference(ModContext ctx, SymbolRange range, int workbookIndex, ReadOnlySpan<char> table, StructuredReferenceArea area, ReadOnlySpan<char> firstColumn, ReadOnlySpan<char> lastColumn)
     {
         return s_copyVisitor.ExternalStructureReference(ctx, range, workbookIndex, table, area, firstColumn, lastColumn);
     }
 
     /// <inheritdoc />
-    public TransformedSymbol Name(ModContext ctx, SymbolRange range, string name)
+    public TransformedSymbol Name(ModContext ctx, SymbolRange range, ReadOnlySpan<char> name)
     {
         return s_copyVisitor.Name(ctx, range, name);
     }
 
     /// <inheritdoc />
-    public TransformedSymbol SheetName(ModContext ctx, SymbolRange range, string sheet, string name)
+    public TransformedSymbol SheetName(ModContext ctx, SymbolRange range, ReadOnlySpan<char> sheet, ReadOnlySpan<char> name)
     {
         var modifiedSheet = ModifySheet(ctx, sheet);
-        if (modifiedSheet is null)
+        if (modifiedSheet.IsEmpty)
             return TransformedSymbol.ToText(ctx.Formula, range, REF_ERROR);
 
         return s_copyVisitor.SheetName(ctx, range, modifiedSheet, name);
     }
 
     /// <inheritdoc />
-    public TransformedSymbol BangName(ModContext ctx, SymbolRange range, string name)
+    public TransformedSymbol BangName(ModContext ctx, SymbolRange range, ReadOnlySpan<char> name)
     {
         return s_copyVisitor.BangName(ctx, range, name);
     }
 
     /// <inheritdoc />
-    public TransformedSymbol ExternalName(ModContext ctx, SymbolRange range, int workbookIndex, string name)
+    public TransformedSymbol ExternalName(ModContext ctx, SymbolRange range, int workbookIndex, ReadOnlySpan<char> name)
     {
         return s_copyVisitor.ExternalName(ctx, range, workbookIndex, name);
     }
 
     /// <inheritdoc />
-    public TransformedSymbol ExternalSheetName(ModContext ctx, SymbolRange range, int workbookIndex, string sheet, string name)
+    public TransformedSymbol ExternalSheetName(ModContext ctx, SymbolRange range, int workbookIndex, ReadOnlySpan<char> sheet, ReadOnlySpan<char> name)
     {
         return s_copyVisitor.ExternalSheetName(ctx, range, workbookIndex, sheet, name);
     }
@@ -287,9 +295,9 @@ public class RefModVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, M
     /// An extension to modify sheet name, e.g. rename.
     /// </summary>
     /// <param name="ctx">The transformation context.</param>
-    /// <param name="sheetName">Original sheet name.</param>
-    /// <returns>New sheet name. If null, it indicates sheet has been deleted and should be replaced with <c>#REF!</c></returns>
-    protected virtual string? ModifySheet(ModContext ctx, string sheetName)
+    /// <param name="sheetName">Original sheet name, unescaped. The span is valid only during the call.</param>
+    /// <returns>New sheet name, unescaped. If empty, it indicates sheet has been deleted and should be replaced with <c>#REF!</c>.</returns>
+    protected virtual ReadOnlySpan<char> ModifySheet(ModContext ctx, ReadOnlySpan<char> sheetName)
     {
         return sheetName;
     }
@@ -298,9 +306,9 @@ public class RefModVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, M
     /// Modify reference to a cell.
     /// </summary>
     /// <param name="ctx">The origin of formula.</param>
-    /// <param name="table">Original name of a table.</param>
-    /// <returns>Modified name of a table or null if <c>#REF!</c>.</returns>
-    protected virtual string? ModifyTable(ModContext ctx, string table)
+    /// <param name="table">Original name of a table. The span is valid only during the call.</param>
+    /// <returns>Modified name of a table or empty if <c>#REF!</c>.</returns>
+    protected virtual ReadOnlySpan<char> ModifyTable(ModContext ctx, ReadOnlySpan<char> table)
     {
         return table;
     }

@@ -8,17 +8,21 @@ namespace ClosedXML.Parser;
 /// </summary>
 internal static class StringBuilderExtensions
 {
-    public static StringBuilder AppendSheetReference(this StringBuilder sb, string? sheetName)
+    /// <summary>
+    /// Append a sheet name and the reference separator. An empty sheet name is a deleted sheet,
+    /// and it is written as <c>#REF!</c>.
+    /// </summary>
+    public static StringBuilder AppendSheetReference(this StringBuilder sb, ReadOnlySpan<char> sheetName)
     {
-        if (sheetName is null)
+        if (sheetName.IsEmpty)
             return sb.Append("#REF!");
 
         return NameUtils.EscapeName(sb, sheetName).AppendReferenceSeparator();
     }
 
-    public static StringBuilder AppendExternalSheetReference(this StringBuilder sb, int workbookIndex, string sheetName)
+    public static StringBuilder AppendExternalSheetReference(this StringBuilder sb, int workbookIndex, ReadOnlySpan<char> sheetName)
     {
-        if (NameUtils.ShouldQuote(sheetName.AsSpan()))
+        if (NameUtils.ShouldQuote(sheetName))
         {
             return sb
                 .Append('\'')
@@ -32,7 +36,7 @@ internal static class StringBuilderExtensions
             .AppendBookIndex(workbookIndex)
             .AppendSheetReference(sheetName);
     }
-    public static StringBuilder AppendEscapedSheetName(this StringBuilder sb, string sheetName)
+    public static StringBuilder AppendEscapedSheetName(this StringBuilder sb, ReadOnlySpan<char> sheetName)
     {
         var startIndex = sb.Length;
         return sb.Append(sheetName).Replace("'", "''", startIndex, sheetName.Length);

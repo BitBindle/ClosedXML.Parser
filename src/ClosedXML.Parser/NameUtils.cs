@@ -222,9 +222,9 @@ public static class NameUtils
         return true;
     }
 
-    internal static StringBuilder EscapeName(StringBuilder sb, string sheet)
+    internal static StringBuilder EscapeName(StringBuilder sb, ReadOnlySpan<char> sheet)
     {
-        return ShouldQuote(sheet.AsSpan())
+        return ShouldQuote(sheet)
             ? sb.Append('\'').AppendEscapedSheetName(sheet).Append('\'')
             : sb.Append(sheet);
     }

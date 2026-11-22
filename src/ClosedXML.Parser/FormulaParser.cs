@@ -703,17 +703,17 @@ public class FormulaParser<TScalarValue, TNode, TContext>
                         TokenParser.ParseIntraTableReference(GetCurrentToken(), out var specifics, out var firstColumn, out var lastColumn);
                         Consume();
                         var range = new SymbolRange(start, _tokenSource.StartIndex);
-                        return _factory.StructureReference(_context, range, localName.ToString(), specifics, firstColumn, lastColumn ?? firstColumn);
+                        return _factory.StructureReference(_context, range, localName, specifics, firstColumn, lastColumn.IsEmpty ? firstColumn : lastColumn);
                     }
 
                     // 3D reference
                     if (_la == Token.COLON && LL(1) == Token.SINGLE_SHEET_PREFIX)
                     {
-                        var firstSheetName = localName.ToString();
+                        var firstSheetName = localName;
                         Consume(); // COLON
 
                         // TODO: Decouple book prefix from single sheet prefix
-                        TokenParser.ParseSingleSheetPrefix(GetCurrentToken(), out var wbIdx, out string lastSheetName);
+                        TokenParser.ParseSingleSheetPrefix(GetCurrentToken(), out var wbIdx, out var lastSheetName);
                         if (wbIdx is not null)
                             throw Error("External workbook not expected.");
 
@@ -728,7 +728,7 @@ public class FormulaParser<TScalarValue, TNode, TContext>
                         return _factory.Reference3D(_context, new SymbolRange(start, end), firstSheetName, lastSheetName, area.Value);
                     }
 
-                    return _factory.Name(_context, new SymbolRange(start, _tokenSource.StartIndex), localName.ToString());
+                    return _factory.Name(_context, new SymbolRange(start, _tokenSource.StartIndex), localName);
                 }
 
             // reference to another workbook
@@ -744,10 +744,10 @@ public class FormulaParser<TScalarValue, TNode, TContext>
                         TokenParser.ParseIntraTableReference(GetCurrentToken(), out var specifics, out var firstColumn, out var lastColumn);
                         Consume();
                         var range = new SymbolRange(start, _tokenSource.StartIndex);
-                        return _factory.ExternalStructureReference(_context, range, bookPrefix, externalName.ToString(), specifics, firstColumn, lastColumn ?? firstColumn);
+                        return _factory.ExternalStructureReference(_context, range, bookPrefix, externalName, specifics, firstColumn, lastColumn.IsEmpty ? firstColumn : lastColumn);
                     }
 
-                    return _factory.ExternalName(_context, new SymbolRange(start, _tokenSource.StartIndex), bookPrefix, externalName.ToString());
+                    return _factory.ExternalName(_context, new SymbolRange(start, _tokenSource.StartIndex), bookPrefix, externalName);
                 }
             // name_reference: SINGLE_SHEET_PREFIX NAME
             // external_cell_reference: SINGLE_SHEET_PREFIX (A1_CELL | A1_CELL COLON A1_CELL | A1_SPAN_REFERENCE | REF_CONSTANT)
@@ -755,7 +755,7 @@ public class FormulaParser<TScalarValue, TNode, TContext>
                 {
                     var start = _tokenSource.StartIndex;
                     var sheetPrefix = GetCurrentToken();
-                    TokenParser.ParseSingleSheetPrefix(sheetPrefix, out var wbIdx, out string sheetName);
+                    TokenParser.ParseSingleSheetPrefix(sheetPrefix, out var wbIdx, out var sheetName);
                     Consume();
 
                     var area = A1Reference();
@@ -779,8 +779,8 @@ public class FormulaParser<TScalarValue, TNode, TContext>
                     Match(Token.NAME);
                     var range = new SymbolRange(start, _tokenSource.StartIndex);
                     return wbIdx is null
-                        ? _factory.SheetName(_context, range, sheetName, name.ToString())
-                        : _factory.ExternalSheetName(_context, range, wbIdx.Value, sheetName, name.ToString());
+                        ? _factory.SheetName(_context, range, sheetName, name)
+                        : _factory.ExternalSheetName(_context, range, wbIdx.Value, sheetName, name);
                 }
 
             // structure_reference - only for formulas directly in the table, e.g. totals row.
@@ -791,7 +791,7 @@ public class FormulaParser<TScalarValue, TNode, TContext>
                     TokenParser.ParseIntraTableReference(localTableReference, out var specifics, out var firstColumn, out var lastColumn);
                     Consume();
                     var range = new SymbolRange(start, _tokenSource.StartIndex);
-                    return _factory.StructureReference(_context, range, specifics, firstColumn, lastColumn ?? firstColumn);
+                    return _factory.StructureReference(_context, range, specifics, firstColumn, lastColumn.IsEmpty ? firstColumn : lastColumn);
                 }
         }
 
@@ -1110,7 +1110,7 @@ public class FormulaParser<TScalarValue, TNode, TContext>
         return ParseNumber(GetCurrentToken());
     }
 
-    private string ConvertText()
+    private ReadOnlySpan<char> ConvertText()
     {
         return ConvertTextValue(GetCurrentToken());
     }
@@ -1120,15 +1120,16 @@ public class FormulaParser<TScalarValue, TNode, TContext>
     /// end, and each quote in the value is doubled.
     /// </summary>
     /// <remarks>
-    /// The method uses no temporary buffer, because a text literal has no length limit and a
-    /// large buffer on the stack can overflow it.
+    /// Most texts have no quote, and their value is a slice of the token with no allocation.
+    /// A text with a quote gets a new string. The method uses no temporary buffer, because a text
+    /// literal has no length limit and a large buffer on the stack can overflow it.
     /// </remarks>
-    private static string ConvertTextValue(ReadOnlySpan<char> token)
+    private static ReadOnlySpan<char> ConvertTextValue(ReadOnlySpan<char> token)
     {
         var text = token.Slice(1, token.Length - 2);
         var quoteCount = text.Count('"');
         if (quoteCount == 0)
-            return text.ToString();
+            return text;
 
         return string.Create(text.Length - quoteCount / 2, text, static (unescaped, escaped) =>
         {

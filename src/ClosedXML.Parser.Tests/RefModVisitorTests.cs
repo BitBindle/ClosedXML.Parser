@@ -30,10 +30,24 @@ public class RefModVisitorTests
     [Theory]
     [InlineData("Old!#REF!", "Old", null, "#REF!#REF!")]
     [InlineData("Old!#REF!", "Old", "New", "New!#REF!")]
+    [InlineData("'Old sheet'!#REF!", "Old sheet", "New sheet", "'New sheet'!#REF!")]
+    [InlineData("'Old''s'!#REF!", "Old's", "New", "New!#REF!")]
     public void ErrorNode_can_modify_sheet(string formula, string oldSheetName, string? newSheetName, string modifiedFormula)
     {
         var factory = new FormulaVisitor { SheetMap = { { oldSheetName, newSheetName } } };
         AssertChangesA1(formula, factory, modifiedFormula);
+    }
+
+    [Theory]
+    [InlineData("'Old sheet'!#REF!")]
+    [InlineData("'It''s'!#REF!")]
+    [InlineData("[1]Old!#REF!")]
+    [InlineData("'[1]Old sheet'!#REF!")]
+    public void ErrorNode_with_sheet_keeps_formula_when_sheet_does_not_change(string formula)
+    {
+        // The sheet name in the formula is in quotes, but the visitor gets the unescaped name.
+        var factory = new FormulaVisitor { SheetMap = { { "Old", "New" } } };
+        AssertChangesA1(formula, factory, formula);
     }
 
     [Theory]
@@ -75,6 +89,22 @@ public class RefModVisitorTests
 
     #endregion
 
+    #region ModifyTable
+
+    [Theory]
+    [Trait("Issue", "20")]
+    [InlineData("Old[Col]", "Old", "New", "New[Col]")]
+    [InlineData("SUM(Old[[#Data],[A]:[B]])", "Old", "New", "SUM(New[[#Data],[A]:[B]])")]
+    [InlineData("Old[Col]", "Old", null, "#REF!")]
+    [InlineData("Other[Col]", "Old", null, "Other[Col]")]
+    public void ModifyTable_can_rename_or_delete_table(string formula, string oldTableName, string? newTableName, string modifiedFormula)
+    {
+        var factory = new TableVisitor { TableMap = { { oldTableName, newTableName } } };
+        AssertChangesA1(formula, factory, modifiedFormula);
+    }
+
+    #endregion
+
     [Theory]
     [InlineData("5 + !$B1", "$B1", "$7:$9", "5 + !$7:$9")]
     [InlineData("5 + !$B1", "$B1", null, "5 + !#REF!")]
@@ -102,9 +132,23 @@ public class RefModVisitorTests
     {
         public Dictionary<string, string?> SheetMap { get; } = new();
 
-        protected override string? ModifySheet(ModContext ctx, string sheetName)
+        protected override ReadOnlySpan<char> ModifySheet(ModContext ctx, ReadOnlySpan<char> sheetName)
         {
-            return SheetMap.GetValueOrDefault(sheetName, sheetName);
+            // A null value is a deleted sheet, and it becomes an empty span.
+            var lookup = SheetMap.GetAlternateLookup<ReadOnlySpan<char>>();
+            return lookup.TryGetValue(sheetName, out var newName) ? newName : sheetName;
+        }
+    }
+
+    private class TableVisitor : RefModVisitor
+    {
+        public Dictionary<string, string?> TableMap { get; } = new();
+
+        protected override ReadOnlySpan<char> ModifyTable(ModContext ctx, ReadOnlySpan<char> table)
+        {
+            // A null value is a deleted table, and it becomes an empty span.
+            var lookup = TableMap.GetAlternateLookup<ReadOnlySpan<char>>();
+            return lookup.TryGetValue(table, out var newName) ? newName : table;
         }
     }
 

@@ -274,7 +274,7 @@ public class AstFactoryTests
 
     private class TextVisitor : BaseVisitor
     {
-        public override string TextNode(Result context, SymbolRange range, string text)
+        public override string TextNode(Result context, SymbolRange range, ReadOnlySpan<char> text)
         {
             context.Value = range;
             return string.Empty;
@@ -301,7 +301,7 @@ public class AstFactoryTests
 
     private class SheetReferenceVisitor : BaseVisitor
     {
-        public override string SheetReference(Result context, SymbolRange range, string sheet, ReferenceArea reference)
+        public override string SheetReference(Result context, SymbolRange range, ReadOnlySpan<char> sheet, ReferenceArea reference)
         {
             context.Value = range;
             return string.Empty;
@@ -319,7 +319,7 @@ public class AstFactoryTests
 
     private class Reference3DVisitor : BaseVisitor
     {
-        public override string Reference3D(Result context, SymbolRange range, string firstSheet, string lastSheet, ReferenceArea reference)
+        public override string Reference3D(Result context, SymbolRange range, ReadOnlySpan<char> firstSheet, ReadOnlySpan<char> lastSheet, ReferenceArea reference)
         {
             context.Value = range;
             return string.Empty;
@@ -328,7 +328,7 @@ public class AstFactoryTests
 
     private class ExternalSheetReferenceVisitor : BaseVisitor
     {
-        public override string ExternalSheetReference(Result context, SymbolRange range, int workbookIndex, string sheet, ReferenceArea reference)
+        public override string ExternalSheetReference(Result context, SymbolRange range, int workbookIndex, ReadOnlySpan<char> sheet, ReferenceArea reference)
         {
             context.Value = range;
             return string.Empty;
@@ -337,7 +337,7 @@ public class AstFactoryTests
 
     private class ExternalReference3DVisitor : BaseVisitor
     {
-        public override string ExternalReference3D(Result context, SymbolRange range, int workbookIndex, string firstSheet, string lastSheet, ReferenceArea reference)
+        public override string ExternalReference3D(Result context, SymbolRange range, int workbookIndex, ReadOnlySpan<char> firstSheet, ReadOnlySpan<char> lastSheet, ReferenceArea reference)
         {
             context.Value = range;
             return string.Empty;
@@ -355,7 +355,7 @@ public class AstFactoryTests
 
     private class StructureReferenceNoTableVisitor : BaseVisitor
     {
-        public override string StructureReference(Result context, SymbolRange range, StructuredReferenceArea area, string? firstColumn, string? lastColumn)
+        public override string StructureReference(Result context, SymbolRange range, StructuredReferenceArea area, ReadOnlySpan<char> firstColumn, ReadOnlySpan<char> lastColumn)
         {
             context.Value = range;
             return string.Empty;
@@ -364,7 +364,7 @@ public class AstFactoryTests
 
     private class StructureReferenceVisitor : BaseVisitor
     {
-        public override string StructureReference(Result context, SymbolRange range, string table, StructuredReferenceArea area, string? firstColumn, string? lastColumn)
+        public override string StructureReference(Result context, SymbolRange range, ReadOnlySpan<char> table, StructuredReferenceArea area, ReadOnlySpan<char> firstColumn, ReadOnlySpan<char> lastColumn)
         {
             context.Value = range;
             return string.Empty;
@@ -373,7 +373,7 @@ public class AstFactoryTests
 
     private class ExternalStructureReferenceVisitor : BaseVisitor
     {
-        public override string ExternalStructureReference(Result context, SymbolRange range, int workbookIndex, string table, StructuredReferenceArea area, string? firstColumn, string? lastColumn)
+        public override string ExternalStructureReference(Result context, SymbolRange range, int workbookIndex, ReadOnlySpan<char> table, StructuredReferenceArea area, ReadOnlySpan<char> firstColumn, ReadOnlySpan<char> lastColumn)
         {
             context.Value = range;
             return string.Empty;
@@ -400,7 +400,7 @@ public class AstFactoryTests
 
     private class SheetFunctionVisitor : BaseVisitor
     {
-        public override string Function(Result context, SymbolRange range, string sheetName, ReadOnlySpan<char> functionName, IReadOnlyList<string> arguments)
+        public override string Function(Result context, SymbolRange range, ReadOnlySpan<char> sheetName, ReadOnlySpan<char> functionName, IReadOnlyList<string> arguments)
         {
             context.Value = range;
             return string.Empty;
@@ -409,7 +409,7 @@ public class AstFactoryTests
 
     private class ExternalSheetFunctionVisitor : BaseVisitor
     {
-        public override string ExternalFunction(Result context, SymbolRange range, int workbookIndex, string sheetName, ReadOnlySpan<char> functionName, IReadOnlyList<string> arguments)
+        public override string ExternalFunction(Result context, SymbolRange range, int workbookIndex, ReadOnlySpan<char> sheetName, ReadOnlySpan<char> functionName, IReadOnlyList<string> arguments)
         {
             context.Value = range;
             return string.Empty;
@@ -418,7 +418,7 @@ public class AstFactoryTests
 
     private class NameVisitor : BaseVisitor
     {
-        public override string Name(Result context, SymbolRange range, string name)
+        public override string Name(Result context, SymbolRange range, ReadOnlySpan<char> name)
         {
             context.Value = range;
             return string.Empty;
@@ -427,7 +427,7 @@ public class AstFactoryTests
 
     private class SheetNameVisitor : BaseVisitor
     {
-        public override string SheetName(Result context, SymbolRange range, string sheetName, string name)
+        public override string SheetName(Result context, SymbolRange range, ReadOnlySpan<char> sheetName, ReadOnlySpan<char> name)
         {
             context.Value = range;
             return string.Empty;
@@ -436,7 +436,7 @@ public class AstFactoryTests
 
     private class ExternalNameVisitor : BaseVisitor
     {
-        public override string ExternalName(Result context, SymbolRange range, int workbookIndex, string name)
+        public override string ExternalName(Result context, SymbolRange range, int workbookIndex, ReadOnlySpan<char> name)
         {
             context.Value = range;
             return string.Empty;
@@ -445,7 +445,7 @@ public class AstFactoryTests
 
     private class ExternalSheetNameVisitor : BaseVisitor
     {
-        public override string ExternalSheetName(Result context, SymbolRange range, int workbookIndex, string sheet, string name)
+        public override string ExternalSheetName(Result context, SymbolRange range, int workbookIndex, ReadOnlySpan<char> sheet, ReadOnlySpan<char> name)
         {
             context.Value = range;
             return string.Empty;
@@ -524,7 +524,7 @@ public class AstFactoryTests
             return _defaultScalar;
         }
 
-        public virtual TScalarValue TextValue(TContext context, SymbolRange range, string text)
+        public virtual TScalarValue TextValue(TContext context, SymbolRange range, ReadOnlySpan<char> text)
         {
             return _defaultScalar;
         }
@@ -560,7 +560,7 @@ public class AstFactoryTests
             return _defaultNode;
         }
 
-        public virtual TNode TextNode(TContext context, SymbolRange range, string text)
+        public virtual TNode TextNode(TContext context, SymbolRange range, ReadOnlySpan<char> text)
         {
             return _defaultNode;
         }
@@ -570,7 +570,7 @@ public class AstFactoryTests
             return _defaultNode;
         }
 
-        public virtual TNode SheetReference(TContext context, SymbolRange range, string sheet, ReferenceArea reference)
+        public virtual TNode SheetReference(TContext context, SymbolRange range, ReadOnlySpan<char> sheet, ReferenceArea reference)
         {
             return _defaultNode;
         }
@@ -580,17 +580,17 @@ public class AstFactoryTests
             return _defaultNode;
         }
 
-        public virtual TNode Reference3D(TContext context, SymbolRange range, string firstSheet, string lastSheet, ReferenceArea reference)
+        public virtual TNode Reference3D(TContext context, SymbolRange range, ReadOnlySpan<char> firstSheet, ReadOnlySpan<char> lastSheet, ReferenceArea reference)
         {
             return _defaultNode;
         }
 
-        public virtual TNode ExternalSheetReference(TContext context, SymbolRange range, int workbookIndex, string sheet, ReferenceArea reference)
+        public virtual TNode ExternalSheetReference(TContext context, SymbolRange range, int workbookIndex, ReadOnlySpan<char> sheet, ReferenceArea reference)
         {
             return _defaultNode;
         }
 
-        public virtual TNode ExternalReference3D(TContext context, SymbolRange range, int workbookIndex, string firstSheet, string lastSheet,
+        public virtual TNode ExternalReference3D(TContext context, SymbolRange range, int workbookIndex, ReadOnlySpan<char> firstSheet, ReadOnlySpan<char> lastSheet,
             ReferenceArea reference)
         {
             return _defaultNode;
@@ -601,12 +601,12 @@ public class AstFactoryTests
             return _defaultNode;
         }
 
-        public virtual TNode Function(TContext context, SymbolRange range, string sheetName, ReadOnlySpan<char> functionName, IReadOnlyList<TNode> args)
+        public virtual TNode Function(TContext context, SymbolRange range, ReadOnlySpan<char> sheetName, ReadOnlySpan<char> functionName, IReadOnlyList<TNode> args)
         {
             return _defaultNode;
         }
 
-        public virtual TNode ExternalFunction(TContext context, SymbolRange range, int workbookIndex, string sheetName, ReadOnlySpan<char> functionName,
+        public virtual TNode ExternalFunction(TContext context, SymbolRange range, int workbookIndex, ReadOnlySpan<char> sheetName, ReadOnlySpan<char> functionName,
             IReadOnlyList<TNode> arguments)
         {
             return _defaultNode;
@@ -622,43 +622,43 @@ public class AstFactoryTests
             return _defaultNode;
         }
 
-        public virtual TNode StructureReference(TContext context, SymbolRange range, StructuredReferenceArea area, string? firstColumn, string? lastColumn)
+        public virtual TNode StructureReference(TContext context, SymbolRange range, StructuredReferenceArea area, ReadOnlySpan<char> firstColumn, ReadOnlySpan<char> lastColumn)
         {
             return _defaultNode;
         }
 
-        public virtual TNode StructureReference(TContext context, SymbolRange range, string table, StructuredReferenceArea area, string? firstColumn, string? lastColumn)
+        public virtual TNode StructureReference(TContext context, SymbolRange range, ReadOnlySpan<char> table, StructuredReferenceArea area, ReadOnlySpan<char> firstColumn, ReadOnlySpan<char> lastColumn)
         {
             return _defaultNode;
         }
 
-        public virtual TNode ExternalStructureReference(TContext context, SymbolRange range, int workbookIndex, string table, StructuredReferenceArea area,
-            string? firstColumn, string? lastColumn)
+        public virtual TNode ExternalStructureReference(TContext context, SymbolRange range, int workbookIndex, ReadOnlySpan<char> table, StructuredReferenceArea area,
+            ReadOnlySpan<char> firstColumn, ReadOnlySpan<char> lastColumn)
         {
             return _defaultNode;
         }
 
-        public virtual TNode Name(TContext context, SymbolRange range, string name)
+        public virtual TNode Name(TContext context, SymbolRange range, ReadOnlySpan<char> name)
         {
             return _defaultNode;
         }
 
-        public virtual TNode SheetName(TContext context, SymbolRange range, string sheet, string name)
+        public virtual TNode SheetName(TContext context, SymbolRange range, ReadOnlySpan<char> sheet, ReadOnlySpan<char> name)
         {
             return _defaultNode;
         }
 
-        public TNode BangName(TContext context, SymbolRange range, string name)
+        public TNode BangName(TContext context, SymbolRange range, ReadOnlySpan<char> name)
         {
             return _defaultNode;
         }
 
-        public virtual TNode ExternalName(TContext context, SymbolRange range, int workbookIndex, string name)
+        public virtual TNode ExternalName(TContext context, SymbolRange range, int workbookIndex, ReadOnlySpan<char> name)
         {
             return _defaultNode;
         }
 
-        public virtual TNode ExternalSheetName(TContext context, SymbolRange range, int workbookIndex, string sheet, string name)
+        public virtual TNode ExternalSheetName(TContext context, SymbolRange range, int workbookIndex, ReadOnlySpan<char> sheet, ReadOnlySpan<char> name)
         {
             return _defaultNode;
         }

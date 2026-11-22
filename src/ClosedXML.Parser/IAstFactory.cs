@@ -7,10 +7,17 @@ namespace ClosedXML.Parser;
 /// A factory used to create an AST through <see cref="FormulaParser{TScalarValue,TNode,TContext}"/>.
 /// </summary>
 /// <remarks>
-/// Sheet names are in most cases strings, while most other texts are <c>ReadOnlySpan&lt;char&gt;</c>.
-/// The reason is that sheet name is always used as-is and in some methods is null, while
-/// other parameters might be processed. E.g. errors are likely to be transformed to enum, function name
-/// might need conversion from text <c>IFS</c> to <c>_xlfn.IFS</c> and so on.
+/// <para>
+/// All texts (texts, names, sheet names, table names, column names, function names and errors)
+/// are <c>ReadOnlySpan&lt;char&gt;</c>, so that the parser does not allocate a string for each of
+/// them. A factory calls <c>ToString()</c> only when it must keep the text, and it can find
+/// a name in a dictionary without an allocation, e.g. with
+/// <c>Dictionary&lt;string, T&gt;.GetAlternateLookup&lt;ReadOnlySpan&lt;char&gt;&gt;()</c>.
+/// </para>
+/// <para>
+/// A span is valid only during the call. The parser can give an unescaped text in a temporary
+/// buffer, so a factory must not keep the span after the call.
+/// </para>
 /// </remarks>
 /// <typeparam name="TScalarValue">Type of a scalar value used across expressions.</typeparam>
 /// <typeparam name="TNode">Type of a node used in the AST.</typeparam>
@@ -39,7 +46,7 @@ public interface IAstFactory<TScalarValue, TNode, in TContext>
     /// <param name="context">User supplied context for parsing a tree that is an argument of a parsing method.</param>
     /// <param name="range">Symbol range of the text token in the formula.</param>
     /// <param name="text">The text. The characters of text are already unescaped.</param>
-    TScalarValue TextValue(TContext context, SymbolRange range, string text);
+    TScalarValue TextValue(TContext context, SymbolRange range, ReadOnlySpan<char> text);
 
     /// <summary>
     /// Create an error for an array item.
@@ -101,7 +108,7 @@ public interface IAstFactory<TScalarValue, TNode, in TContext>
     /// <param name="context">User supplied context for parsing a tree that is an argument of a parsing method.</param>
     /// <param name="range">Range in a formula that contains the text.</param>
     /// <param name="text">The text. The characters of text are already unescaped.</param>
-    TNode TextNode(TContext context, SymbolRange range, string text);
+    TNode TextNode(TContext context, SymbolRange range, ReadOnlySpan<char> text);
 
     /// <summary>
     /// Create a node for a reference to cells without a worksheet.
@@ -118,7 +125,7 @@ public interface IAstFactory<TScalarValue, TNode, in TContext>
     /// <param name="range">Range in a formula that contains the sheet reference.</param>
     /// <param name="sheet">Name of a sheet (unescaped) of the <paramref name="reference"/>.</param>
     /// <param name="reference">Area in the sheet.</param>
-    TNode SheetReference(TContext context, SymbolRange range, string sheet, ReferenceArea reference);
+    TNode SheetReference(TContext context, SymbolRange range, ReadOnlySpan<char> sheet, ReferenceArea reference);
 
     /// <summary>
     /// Create a node that processes a bang reference in a formula (e.g <c>"Branch:" &amp; !$C$5</c>). Bang reference should
@@ -140,7 +147,7 @@ public interface IAstFactory<TScalarValue, TNode, in TContext>
     /// <param name="firstSheet">First sheet of 3D reference.</param>
     /// <param name="lastSheet">Last sheet of 3D reference.</param>
     /// <param name="reference">Area in all sheets of 3D reference.</param>
-    TNode Reference3D(TContext context, SymbolRange range, string firstSheet, string lastSheet, ReferenceArea reference);
+    TNode Reference3D(TContext context, SymbolRange range, ReadOnlySpan<char> firstSheet, ReadOnlySpan<char> lastSheet, ReferenceArea reference);
 
     /// <summary>
     /// Create a node for a reference to cells of a specific sheet in a different worksheet.
@@ -150,7 +157,7 @@ public interface IAstFactory<TScalarValue, TNode, in TContext>
     /// <param name="workbookIndex">Id of an external workbook. The actual path to the file is in workbook part, <c>externalReferences</c> tag.</param>
     /// <param name="sheet">Name of a sheet (unescaped) of the <paramref name="reference"/>.</param>
     /// <param name="reference">Area the external sheet.</param>
-    TNode ExternalSheetReference(TContext context, SymbolRange range, int workbookIndex, string sheet, ReferenceArea reference);
+    TNode ExternalSheetReference(TContext context, SymbolRange range, int workbookIndex, ReadOnlySpan<char> sheet, ReferenceArea reference);
 
     /// <summary>
     /// Create a node for a 3D reference in a different workbook.
@@ -161,7 +168,7 @@ public interface IAstFactory<TScalarValue, TNode, in TContext>
     /// <param name="firstSheet">First sheet of 3D reference.</param>
     /// <param name="lastSheet">Last sheet of 3D reference.</param>
     /// <param name="reference">Area in all sheets of 3D reference.</param>
-    TNode ExternalReference3D(TContext context, SymbolRange range, int workbookIndex, string firstSheet, string lastSheet, ReferenceArea reference);
+    TNode ExternalReference3D(TContext context, SymbolRange range, int workbookIndex, ReadOnlySpan<char> firstSheet, ReadOnlySpan<char> lastSheet, ReferenceArea reference);
 
     /// <summary>
     /// Create a node for a function.
@@ -180,7 +187,7 @@ public interface IAstFactory<TScalarValue, TNode, in TContext>
     /// <param name="sheetName">Name of a sheet.</param>
     /// <param name="functionName">Name of a function.</param>
     /// <param name="args">Nodes of argument values.</param>
-    TNode Function(TContext context, SymbolRange range, string sheetName, ReadOnlySpan<char> functionName,
+    TNode Function(TContext context, SymbolRange range, ReadOnlySpan<char> sheetName, ReadOnlySpan<char> functionName,
         IReadOnlyList<TNode> args);
 
     /// <summary>
@@ -192,7 +199,7 @@ public interface IAstFactory<TScalarValue, TNode, in TContext>
     /// <param name="sheetName">Name of a sheet in external workbook.</param>
     /// <param name="functionName">Name of the function.</param>
     /// <param name="arguments">Nodes of argument values.</param>
-    TNode ExternalFunction(TContext context, SymbolRange range, int workbookIndex, string sheetName,
+    TNode ExternalFunction(TContext context, SymbolRange range, int workbookIndex, ReadOnlySpan<char> sheetName,
         ReadOnlySpan<char> functionName, IReadOnlyList<TNode> arguments);
 
     /// <summary>
@@ -222,9 +229,9 @@ public interface IAstFactory<TScalarValue, TNode, in TContext>
     /// <param name="context">User supplied context for parsing a tree that is an argument of a parsing method.</param>
     /// <param name="range">Range in a formula that contains the structure reference.</param>
     /// <param name="area">A portion of a table that should be considered.</param>
-    /// <param name="firstColumn">The first column of a range. Null, if whole table. If only one column, same as <paramref name="lastColumn"/>.</param>
-    /// <param name="lastColumn">The last column of a range. Null, if whole table.If only one column, same as <paramref name="firstColumn"/>.</param>
-    TNode StructureReference(TContext context, SymbolRange range, StructuredReferenceArea area, string? firstColumn, string? lastColumn);
+    /// <param name="firstColumn">The first column of a range, unescaped. Empty, if whole table. If only one column, same as <paramref name="lastColumn"/>.</param>
+    /// <param name="lastColumn">The last column of a range, unescaped. Empty, if whole table. If only one column, same as <paramref name="firstColumn"/>.</param>
+    TNode StructureReference(TContext context, SymbolRange range, StructuredReferenceArea area, ReadOnlySpan<char> firstColumn, ReadOnlySpan<char> lastColumn);
 
     /// <summary>
     /// Create a node to represent a structure reference to a table.
@@ -233,9 +240,9 @@ public interface IAstFactory<TScalarValue, TNode, in TContext>
     /// <param name="range">Range in a formula that contains the structure reference.</param>
     /// <param name="table">A name of a table.</param>
     /// <param name="area">A portion of a table that should be considered.</param>
-    /// <param name="firstColumn">The first column of a range. Null, if whole table. If only one column, same as <paramref name="lastColumn"/>.</param>
-    /// <param name="lastColumn">The last column of a range. Null, if whole table.If only one column, same as <paramref name="firstColumn"/>.</param>
-    TNode StructureReference(TContext context, SymbolRange range, string table, StructuredReferenceArea area, string? firstColumn, string? lastColumn);
+    /// <param name="firstColumn">The first column of a range, unescaped. Empty, if whole table. If only one column, same as <paramref name="lastColumn"/>.</param>
+    /// <param name="lastColumn">The last column of a range, unescaped. Empty, if whole table. If only one column, same as <paramref name="firstColumn"/>.</param>
+    TNode StructureReference(TContext context, SymbolRange range, ReadOnlySpan<char> table, StructuredReferenceArea area, ReadOnlySpan<char> firstColumn, ReadOnlySpan<char> lastColumn);
 
     /// <summary>
     /// Create a node to represent a structure reference to a table in some other workbook.
@@ -245,9 +252,9 @@ public interface IAstFactory<TScalarValue, TNode, in TContext>
     /// <param name="workbookIndex">Id of external workbook.</param>
     /// <param name="table">A name of a table.</param>
     /// <param name="area">A portion of a table that should be considered.</param>
-    /// <param name="firstColumn">The first column of a range. Null, if whole table. If only one column, same as <paramref name="lastColumn"/>.</param>
-    /// <param name="lastColumn">The last column of a range. Null, if whole table.If only one column, same as <paramref name="firstColumn"/>.</param>
-    TNode ExternalStructureReference(TContext context, SymbolRange range, int workbookIndex, string table, StructuredReferenceArea area, string? firstColumn, string? lastColumn);
+    /// <param name="firstColumn">The first column of a range, unescaped. Empty, if whole table. If only one column, same as <paramref name="lastColumn"/>.</param>
+    /// <param name="lastColumn">The last column of a range, unescaped. Empty, if whole table. If only one column, same as <paramref name="firstColumn"/>.</param>
+    TNode ExternalStructureReference(TContext context, SymbolRange range, int workbookIndex, ReadOnlySpan<char> table, StructuredReferenceArea area, ReadOnlySpan<char> firstColumn, ReadOnlySpan<char> lastColumn);
 
     /// <summary>
     /// Create a node that should evaluate to a value of a name defined in a workbook.
@@ -259,7 +266,7 @@ public interface IAstFactory<TScalarValue, TNode, in TContext>
     /// <param name="context">User supplied context for parsing a tree that is an argument of a parsing method.</param>
     /// <param name="range">Range in a formula that contains the name.</param>
     /// <param name="name">The defined name.</param>
-    TNode Name(TContext context, SymbolRange range, string name);
+    TNode Name(TContext context, SymbolRange range, ReadOnlySpan<char> name);
 
     /// <summary>
     /// Create a node that should evaluate to a value of a name defined in a worksheet.
@@ -272,7 +279,7 @@ public interface IAstFactory<TScalarValue, TNode, in TContext>
     /// <param name="range">Range in a formula that contains the name.</param>
     /// <param name="sheet">Name of a sheet, unescaped.</param>
     /// <param name="name">The defined name.</param>
-    TNode SheetName(TContext context, SymbolRange range, string sheet, string name);
+    TNode SheetName(TContext context, SymbolRange range, ReadOnlySpan<char> sheet, ReadOnlySpan<char> name);
 
     /// <summary>
     /// Create a node that processes a bang name in a formula (e.g <c>"Branch:" &amp; !Data</c>). Bang reference should
@@ -284,7 +291,7 @@ public interface IAstFactory<TScalarValue, TNode, in TContext>
     /// <param name="context">User supplied context for parsing a tree that is an argument of a parsing method.</param>
     /// <param name="range">Range in a formula that contains the bang reference.</param>
     /// <param name="name">The defined name.</param>
-    TNode BangName(TContext context, SymbolRange range, string name);
+    TNode BangName(TContext context, SymbolRange range, ReadOnlySpan<char> name);
 
     /// <summary>
     /// Create a node that should evaluate to a value of a defined name in a different workbook.
@@ -293,7 +300,7 @@ public interface IAstFactory<TScalarValue, TNode, in TContext>
     /// <param name="range"></param>
     /// <param name="workbookIndex">Id of an external workbook. The actual path to the file is in workbook part, <c>externalReferences</c> tag.</param>
     /// <param name="name">Name from a workbook. It can be defined name or a name of a table.</param>
-    TNode ExternalName(TContext context, SymbolRange range, int workbookIndex, string name);
+    TNode ExternalName(TContext context, SymbolRange range, int workbookIndex, ReadOnlySpan<char> name);
 
     /// <summary>
     /// Create a node that should evaluate to a value of a defined name in a worksheet of a different workbook.
@@ -307,7 +314,7 @@ public interface IAstFactory<TScalarValue, TNode, in TContext>
     /// <param name="workbookIndex">Id of an external workbook. The actual path to the file is in workbook part, <c>externalReferences</c> tag.</param>
     /// <param name="sheet">Name of a sheet in the external workbook, unescaped.</param>
     /// <param name="name">The defined name.</param>
-    TNode ExternalSheetName(TContext context, SymbolRange range, int workbookIndex, string sheet, string name);
+    TNode ExternalSheetName(TContext context, SymbolRange range, int workbookIndex, ReadOnlySpan<char> sheet, ReadOnlySpan<char> name);
 
     /// <summary>
     /// Create a node that performs a binary operation on values from another nodes.

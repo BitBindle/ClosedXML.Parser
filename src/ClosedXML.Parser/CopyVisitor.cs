@@ -32,7 +32,7 @@ public class CopyVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, Mod
     }
 
     /// <inheritdoc />
-    public virtual TransformedSymbol TextValue(ModContext ctx, SymbolRange range, string text)
+    public virtual TransformedSymbol TextValue(ModContext ctx, SymbolRange range, ReadOnlySpan<char> text)
     {
         return TransformedSymbol.CopyOriginal(ctx.Formula, range);
     }
@@ -75,7 +75,7 @@ public class CopyVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, Mod
     }
 
     /// <inheritdoc />
-    public virtual TransformedSymbol TextNode(ModContext ctx, SymbolRange range, string text)
+    public virtual TransformedSymbol TextNode(ModContext ctx, SymbolRange range, ReadOnlySpan<char> text)
     {
         return TransformedSymbol.CopyOriginal(ctx.Formula, range);
     }
@@ -89,7 +89,7 @@ public class CopyVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, Mod
     }
 
     /// <inheritdoc />
-    public virtual TransformedSymbol SheetReference(ModContext ctx, SymbolRange range, string sheet, ReferenceArea reference)
+    public virtual TransformedSymbol SheetReference(ModContext ctx, SymbolRange range, ReadOnlySpan<char> sheet, ReferenceArea reference)
     {
         var sb = new StringBuilder(sheet.Length + QUOTE_RESERVE + SHEET_SEPARATOR_LEN + MAX_R1_C1_LEN);
         var nodeText = sb
@@ -111,10 +111,10 @@ public class CopyVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, Mod
     }
 
     /// <inheritdoc />
-    public virtual TransformedSymbol Reference3D(ModContext ctx, SymbolRange range, string firstSheet, string lastSheet, ReferenceArea reference)
+    public virtual TransformedSymbol Reference3D(ModContext ctx, SymbolRange range, ReadOnlySpan<char> firstSheet, ReadOnlySpan<char> lastSheet, ReferenceArea reference)
     {
         var sb = new StringBuilder(firstSheet.Length + QUOTE_RESERVE + lastSheet.Length + QUOTE_RESERVE + SHEET_SEPARATOR_LEN + MAX_R1_C1_LEN);
-        if (NameUtils.ShouldQuote(firstSheet.AsSpan()) || NameUtils.ShouldQuote(lastSheet.AsSpan()))
+        if (NameUtils.ShouldQuote(firstSheet) || NameUtils.ShouldQuote(lastSheet))
         {
             sb
                 .Append('\'')
@@ -138,7 +138,7 @@ public class CopyVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, Mod
     }
 
     /// <inheritdoc />
-    public virtual TransformedSymbol ExternalSheetReference(ModContext ctx, SymbolRange range, int workbookIndex, string sheet, ReferenceArea reference)
+    public virtual TransformedSymbol ExternalSheetReference(ModContext ctx, SymbolRange range, int workbookIndex, ReadOnlySpan<char> sheet, ReferenceArea reference)
     {
         var sb = new StringBuilder(BOOK_PREFIX_LEN + sheet.Length + QUOTE_RESERVE + SHEET_SEPARATOR_LEN + MAX_R1_C1_LEN);
         var nodeText = sb
@@ -149,10 +149,10 @@ public class CopyVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, Mod
     }
 
     /// <inheritdoc />
-    public virtual TransformedSymbol ExternalReference3D(ModContext ctx, SymbolRange range, int workbookIndex, string firstSheet, string lastSheet, ReferenceArea reference)
+    public virtual TransformedSymbol ExternalReference3D(ModContext ctx, SymbolRange range, int workbookIndex, ReadOnlySpan<char> firstSheet, ReadOnlySpan<char> lastSheet, ReferenceArea reference)
     {
         var sb = new StringBuilder(BOOK_PREFIX_LEN + firstSheet.Length + QUOTE_RESERVE + lastSheet.Length + QUOTE_RESERVE + SHEET_SEPARATOR_LEN + MAX_R1_C1_LEN);
-        if (NameUtils.ShouldQuote(firstSheet.AsSpan()) || NameUtils.ShouldQuote(lastSheet.AsSpan()))
+        if (NameUtils.ShouldQuote(firstSheet) || NameUtils.ShouldQuote(lastSheet))
         {
             sb
                 .Append('\'')
@@ -196,7 +196,7 @@ public class CopyVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, Mod
     }
 
     /// <inheritdoc />
-    public virtual TransformedSymbol Function(ModContext ctx, SymbolRange range, string sheetName, ReadOnlySpan<char> functionName, IReadOnlyList<TransformedSymbol> arguments)
+    public virtual TransformedSymbol Function(ModContext ctx, SymbolRange range, ReadOnlySpan<char> sheetName, ReadOnlySpan<char> functionName, IReadOnlyList<TransformedSymbol> arguments)
     {
         var prefix = new StringBuilder(sheetName.Length + QUOTE_RESERVE + SHEET_SEPARATOR_LEN + functionName.Length)
             .AppendSheetReference(sheetName)
@@ -206,7 +206,7 @@ public class CopyVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, Mod
     }
 
     /// <inheritdoc />
-    public virtual TransformedSymbol ExternalFunction(ModContext ctx, SymbolRange range, int workbookIndex, string sheetName, ReadOnlySpan<char> functionName, IReadOnlyList<TransformedSymbol> arguments)
+    public virtual TransformedSymbol ExternalFunction(ModContext ctx, SymbolRange range, int workbookIndex, ReadOnlySpan<char> sheetName, ReadOnlySpan<char> functionName, IReadOnlyList<TransformedSymbol> arguments)
     {
         var prefix = new StringBuilder(BOOK_PREFIX_LEN + sheetName.Length + QUOTE_RESERVE + SHEET_SEPARATOR_LEN + functionName.Length)
             .AppendExternalSheetReference(workbookIndex, sheetName)
@@ -226,7 +226,7 @@ public class CopyVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, Mod
 
     /// <inheritdoc />
     public virtual TransformedSymbol StructureReference(ModContext ctx, SymbolRange range,
-        StructuredReferenceArea area, string? firstColumn, string? lastColumn)
+        StructuredReferenceArea area, ReadOnlySpan<char> firstColumn, ReadOnlySpan<char> lastColumn)
     {
         var nodeText = GetIntraTableReference(area, firstColumn, lastColumn);
         return ToSymbol(ctx, range, nodeText);
@@ -234,16 +234,16 @@ public class CopyVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, Mod
 
     /// <inheritdoc />
     public virtual TransformedSymbol StructureReference(ModContext ctx, SymbolRange range,
-        string table, StructuredReferenceArea area, string? firstColumn, string? lastColumn)
+        ReadOnlySpan<char> table, StructuredReferenceArea area, ReadOnlySpan<char> firstColumn, ReadOnlySpan<char> lastColumn)
     {
-        var nodeText = table + GetIntraTableReference(area, firstColumn, lastColumn);
+        var nodeText = string.Concat(table, GetIntraTableReference(area, firstColumn, lastColumn).AsSpan());
         return ToSymbol(ctx, range, nodeText);
     }
 
     /// <inheritdoc />
     public virtual TransformedSymbol ExternalStructureReference(ModContext ctx,
-        SymbolRange range, int workbookIndex, string table, StructuredReferenceArea area, string? firstColumn,
-        string? lastColumn)
+        SymbolRange range, int workbookIndex, ReadOnlySpan<char> table, StructuredReferenceArea area, ReadOnlySpan<char> firstColumn,
+        ReadOnlySpan<char> lastColumn)
     {
         var nodeText = new StringBuilder()
             .AppendBookIndex(workbookIndex)
@@ -255,13 +255,13 @@ public class CopyVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, Mod
     }
 
     /// <inheritdoc />
-    public virtual TransformedSymbol Name(ModContext ctx, SymbolRange range, string name)
+    public virtual TransformedSymbol Name(ModContext ctx, SymbolRange range, ReadOnlySpan<char> name)
     {
         return TransformedSymbol.CopyOriginal(ctx.Formula, range);
     }
 
     /// <inheritdoc />
-    public virtual TransformedSymbol SheetName(ModContext ctx, SymbolRange range, string sheet, string name)
+    public virtual TransformedSymbol SheetName(ModContext ctx, SymbolRange range, ReadOnlySpan<char> sheet, ReadOnlySpan<char> name)
     {
         var sb = new StringBuilder(sheet.Length + QUOTE_RESERVE + SHEET_SEPARATOR_LEN + name.Length);
         var nodeText = sb
@@ -272,7 +272,7 @@ public class CopyVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, Mod
     }
 
     /// <inheritdoc />
-    public virtual TransformedSymbol BangName(ModContext ctx, SymbolRange range, string name)
+    public virtual TransformedSymbol BangName(ModContext ctx, SymbolRange range, ReadOnlySpan<char> name)
     {
         var sb = new StringBuilder(SHEET_SEPARATOR_LEN + name.Length);
         var nodeText = sb
@@ -283,7 +283,7 @@ public class CopyVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, Mod
     }
 
     /// <inheritdoc />
-    public virtual TransformedSymbol ExternalName(ModContext ctx, SymbolRange range, int workbookIndex, string name)
+    public virtual TransformedSymbol ExternalName(ModContext ctx, SymbolRange range, int workbookIndex, ReadOnlySpan<char> name)
     {
         var sb = new StringBuilder(BOOK_PREFIX_LEN + SHEET_SEPARATOR_LEN + name.Length);
         var nodeText = sb
@@ -295,7 +295,7 @@ public class CopyVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, Mod
     }
 
     /// <inheritdoc />
-    public virtual TransformedSymbol ExternalSheetName(ModContext ctx, SymbolRange range, int workbookIndex, string sheet, string name)
+    public virtual TransformedSymbol ExternalSheetName(ModContext ctx, SymbolRange range, int workbookIndex, ReadOnlySpan<char> sheet, ReadOnlySpan<char> name)
     {
         var sb = new StringBuilder(BOOK_PREFIX_LEN + sheet.Length + QUOTE_RESERVE + SHEET_SEPARATOR_LEN + name.Length);
         var nodeText = sb
@@ -448,9 +448,9 @@ public class CopyVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, Mod
         public ReadOnlySpan<TransformedSymbol> Children { get; } = children;
     }
 
-    private static string GetIntraTableReference(StructuredReferenceArea area, string? firstColumn, string? lastColumn)
+    private static string GetIntraTableReference(StructuredReferenceArea area, ReadOnlySpan<char> firstColumn, ReadOnlySpan<char> lastColumn)
     {
-        if (firstColumn is null || lastColumn is null)
+        if (firstColumn.IsEmpty || lastColumn.IsEmpty)
         {
             // No column
 
@@ -467,7 +467,7 @@ public class CopyVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, Mod
             return Keyword(area);
         }
 
-        if (firstColumn == lastColumn)
+        if (firstColumn.SequenceEqual(lastColumn))
         {
             // One column
             if (area == StructuredReferenceArea.None)
