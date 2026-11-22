@@ -293,8 +293,8 @@ public class RefModVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, M
     }
 
     /// <summary>
-    /// An extension to modify sheet name, e.g. rename. The visitor calls it only for sheets of
-    /// the workbook of the formula. Sheets of other workbooks do not change.
+    /// Modify the name of a sheet, for example to rename it. The visitor calls it only for sheets
+    /// of the workbook of the formula. Sheets of other workbooks do not change.
     /// </summary>
     /// <param name="ctx">The transformation context.</param>
     /// <param name="sheetName">Original sheet name, unescaped. The span is valid only during the call.</param>
