@@ -413,7 +413,8 @@ public class FormulaParser<TScalarValue, TNode, TContext>
         var start = GetStart(replaceFirstAtom);
 
         // The INTERSECT operator is a prefix operator. When the parser replaces the first atom, the parser
-        // has already read the atom. An INTERSECT token after the atom is not a prefix of it, e.g. `(A1)@`.
+        // read the atom before. An INTERSECT token after the atom is not a prefix of the atom. For example,
+        // `(A1)@` is not valid.
         if (_la == Token.INTERSECT && !replaceFirstAtom)
         {
             Consume();
