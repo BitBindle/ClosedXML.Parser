@@ -294,7 +294,7 @@ public class ReferenceParserTests
 
     [Fact]
     [Trait("Issue", "22")]
-    public void Span_outputs_are_slices_of_text_when_sheet_is_not_escaped()
+    public void Span_outputs_are_slices_of_text_when_sheet_has_no_doubled_tick()
     {
         var text = "'Hello World'!Data".AsSpan();
         Assert.True(ReferenceParser.TryParseSheetName(text, out ReadOnlySpan<char> sheet, out var name));

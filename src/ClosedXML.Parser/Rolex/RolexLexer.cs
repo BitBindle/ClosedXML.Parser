@@ -34,8 +34,8 @@ internal class RolexLexer
 
     /// <summary>
     /// Get the first tokens of a formula into <paramref name="tokens"/>. Use A1 semantic. The
-    /// lexer stops when the buffer is full, thus the last token is EOF or an error only when the
-    /// formula has fewer tokens than the buffer.
+    /// lexer stops when the buffer is full. If the buffer becomes full before the end of the
+    /// formula, the last token is not EOF.
     /// </summary>
     /// <param name="formula">Formula to parse.</param>
     /// <param name="tokens">The buffer for the tokens.</param>

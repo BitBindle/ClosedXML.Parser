@@ -8,8 +8,8 @@ namespace ClosedXML.Parser;
 /// </summary>
 /// <remarks>
 /// Each method has an overload for <see cref="ReadOnlySpan{T}"/>. The output spans of these
-/// overloads are slices of the input text, or a new string when the sheet name in the text is
-/// escaped (e.g. <c>'Jane''s'!A1</c>). Thus they do not allocate for most texts.
+/// overloads are slices of the input text, or a new string when the sheet name contains a
+/// doubled tick (e.g. <c>'Jane''s'!A1</c>). Thus they do not allocate for most texts.
 /// </remarks>
 public static class ReferenceParser
 {
