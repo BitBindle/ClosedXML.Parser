@@ -24,7 +24,7 @@ The base branch is `develop`.
 
 ## Build, test and check
 
-Do these steps before the review gate. The commands are based on `.github/workflows/dotnet.yml`. `global.json` sets the .NET SDK version.
+Do these steps before the review gate. The commands are based on `.github/workflows/ci.yml`. `global.json` sets the .NET SDK version.
 
 1. Build the solution:
 

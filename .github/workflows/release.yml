@@ -50,6 +50,16 @@ jobs:
           echo "Releasing $version" >> "$GITHUB_STEP_SUMMARY"
           echo "Releasing $version"
 
+      - name: Check that nuget.org does not have the version
+        # The fork uses the package ID of the upstream package on nuget.org. NuGet keeps one package for each ID
+        # and version in the global packages folder. Thus a consumer of the two feeds can get the wrong package.
+        run: |
+          versions="$(curl --fail --silent --show-error https://api.nuget.org/v3-flatcontainer/closedxml.parser/index.json)"
+          if jq --exit-status --arg v "${version,,}" '.versions | index($v)' <<< "$versions" > /dev/null; then
+            echo "::error::nuget.org already has ClosedXML.Parser $version. Change VersionMajorMinor or VersionSuffix in Directory.Build.props."
+            exit 1
+          fi
+
       - name: Restore dependencies
         run: dotnet restore ClosedXML.Parser.slnx
 
