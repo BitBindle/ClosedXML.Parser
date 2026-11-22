@@ -428,6 +428,14 @@ internal static class TokenParser
             i += GetLength(listItem) + 1;
             area |= listItem;
 
+            if (IsEndOfInnerReference(input, i))
+            {
+                // Pattern is a keyword list without a column, for example '[[#Data]]'.
+                firstColumn = ReadOnlySpan<char>.Empty;
+                lastColumn = ReadOnlySpan<char>.Empty;
+                return;
+            }
+
             i = SkipComma(input, i);
         }
 
@@ -440,6 +448,14 @@ internal static class TokenParser
             i += GetLength(listItem) + 1;
             area |= listItem;
 
+            if (IsEndOfInnerReference(input, i))
+            {
+                // Pattern is a keyword list without a column, for example '[[#Data],[#Totals]]'.
+                firstColumn = ReadOnlySpan<char>.Empty;
+                lastColumn = ReadOnlySpan<char>.Empty;
+                return;
+            }
+
             i = SkipComma(input, i);
         }
 
@@ -450,6 +466,16 @@ internal static class TokenParser
             GetStructuredName(input, i + 1, out lastColumn);
         else
             lastColumn = ReadOnlySpan<char>.Empty;
+    }
+
+    /// <summary>
+    /// Is the char at <paramref name="i"/>, after optional whitespaces, the end bracket of the
+    /// inner reference (SPACED_RBRACKET)? A comma is there if a keyword or a column follows.
+    /// </summary>
+    private static bool IsEndOfInnerReference(ReadOnlySpan<char> input, int i)
+    {
+        i = SkipWhitespaces(input, i);
+        return input[i] == ']';
     }
 
     private static int SkipComma(ReadOnlySpan<char> input, int i)

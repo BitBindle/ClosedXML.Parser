@@ -272,6 +272,30 @@ public static class NameUtils
 
     private const string DeletedSheetReference = "#REF!";
 
+    /// <summary>
+    /// Chars of a column name in a structured reference that must have an escape tick before them.
+    /// </summary>
+    private static readonly SearchValues<char> ColumnEscapeChars = SearchValues.Create("'[]#");
+
+    /// <summary>
+    /// Append the column name of a structured reference. Each <c>'</c>, <c>[</c>, <c>]</c> and
+    /// <c>#</c> gets a tick before it, for example <c>Col]</c> is written as <c>Col']</c>.
+    /// </summary>
+    /// <param name="sb">The builder to append to.</param>
+    /// <param name="column">The column name, unescaped.</param>
+    internal static StringBuilder AppendEscapedColumnName(StringBuilder sb, ReadOnlySpan<char> column)
+    {
+        var idx = column.IndexOfAny(ColumnEscapeChars);
+        while (idx >= 0)
+        {
+            sb.Append(column[..idx]).Append('\'').Append(column[idx]);
+            column = column[(idx + 1)..];
+            idx = column.IndexOfAny(ColumnEscapeChars);
+        }
+
+        return sb.Append(column);
+    }
+
     internal static StringBuilder EscapeName(StringBuilder sb, ReadOnlySpan<char> sheet)
     {
         return ShouldQuote(sheet)

@@ -105,6 +105,8 @@ public class RefModVisitorTests
     [InlineData("SUM(Old[[#Data],[A]:[B]])", "Old", "New", "SUM(New[[#Data],[A]:[B]])")]
     [InlineData("Old[Col]", "Old", null, "#REF!")]
     [InlineData("Other[Col]", "Old", null, "Other[Col]")]
+    [InlineData("Old[Col']]", "Old", "New", "New[Col']]")]
+    [InlineData("Old[[#Data],[A'[]:[B'#]]", "Old", "New", "New[[#Data],[A'[]:[B'#]]")]
     public void ModifyTable_can_rename_or_delete_table(string formula, string oldTableName, string? newTableName, string modifiedFormula)
     {
         var factory = new TableVisitor { TableMap = { { oldTableName, newTableName } } };
