@@ -1,102 +1,119 @@
-# ClosedParser
+# ClosedXML.Parser
 
-ClosedParser is a project to parse OOXML grammar to create an abstract syntax tree that can be later evaluated.
+ClosedXML.Parser is a .NET library that parses Excel formulas into an abstract syntax tree (AST). ClosedXML uses it to evaluate formulas and to change references in formulas.
 
-Official source for the grammar is [MS-XML](https://learn.microsoft.com/en-us/openspecs/office_standards/ms-xlsx/2c5dee00-eff2-4b22-92b6-0738acd4475e), chapter 2.2.2 Formulas. The provided grammar is not usable for parser generators, it's full of ambiguities and the rules don't take into account operator precedence.
+This repository is a fork of [ClosedXML.Parser](https://github.com/ClosedXML/ClosedXML.Parser) by Jan Havlíček. The fork has its own releases, issues and changes. The license is MIT (see [LICENSE.txt](LICENSE.txt)).
 
-# How to use
+## Package
 
-* Implement `IAstFactory` interface.
-* Call parsing methods
-  * `FormulaParser<TScalarValue, TNode>.CellFormulaA1("Sum(A1, 2)", astFactory)`
-  * `FormulaParser<TScalarValue, TNode>.CellFormulaR1C1("Sum(R1C1, 2)", astFactory)`
+The release workflow publishes the `ClosedXML.Parser` package to GitHub Packages of this repository. The package targets `net10.0`.
 
-# Goals
+To use the package, add the feed to your `nuget.config`:
 
-* __Performance__ - ClosedXML needs to parse formula really fast. Limit allocation and so on.
-* __Evaluation oriented__ - Parser should concentrates on creation of abstract syntax trees, not concrete syntax tree. Goal is evaluation of formulas, not transformation.
-* __Multi-use__ - Formulas are mostly used in cells, but there are other places with different grammar rules (e.g. sparklines, data validation)
-* __Multi notation (A1 or R1C1)__ - Parser should be able to parse both A1 and R1C1 formulas. I.e. `SUM(R5)` can mean return sum of cell `R5` in _A1_ notation, but return sum of all cells on row 5 in _R1C1_ notation.
+```xml
+<configuration>
+  <packageSources>
+    <add key="github-bitbindle" value="https://nuget.pkg.github.com/BitBindle/index.json" />
+  </packageSources>
+</configuration>
+```
 
-Project uses ANTLR4 grammar file as the source of truth and a lexer. There is also ANTLR parser is not used, but is used as a basis of recursive descent parser (ANTLR takes up 8 seconds vs RDS 700ms for parsing of enron dataset).
+GitHub Packages needs authentication, also for a public package. Use a token with the `read:packages` scope.
 
-ANTLR4 one of few maintained parser generators with C# target.
+The package ID is the same as the ID of the upstream package on nuget.org. The release workflow does not publish a version that nuget.org already has.
 
-The project has a low priority, XLParser mostly works, but in the long term, replacement is likely.
+## How to use
 
-## Current performance
+1. Implement the `IAstFactory<TScalarValue, TNode, TContext>` interface. The parser calls the factory for each part of the formula, and the factory creates your nodes.
+2. Call a parse method:
+   * `FormulaParser<TScalarValue, TNode, TContext>.CellFormulaA1("SUM(A1, 2)", context, factory)`
+   * `FormulaParser<TScalarValue, TNode, TContext>.CellFormulaR1C1("SUM(R1C1, 2)", context, factory)`
 
-ENRON dataset parsed using recursive descent parser and DFA lexer in Release mode:
+The library also has these helpers:
 
-* Total: *946320*
-* Elapsed: *1838 ms*
-* Per formula: *1.942 μs*
+* `FormulaConverter` changes a formula from A1 to R1C1 and from R1C1 to A1.
+* `ReferenceParser` parses a reference, for example `Sheet1!A1:B2`.
+* `NameUtils` finds when a sheet name needs quotes in a formula.
 
-2μs per formula should be something like 6000 instructions (under unrealistic assumption 1 instruction per 1 Hz), so basically fast enough.
+The `ClosedXML.Parser.Ast` project has a simple AST and a factory. The tests use it, and it is a good example of a factory.
 
-## Limitations
+## Goals
 
-The primary goal is to parse formulas stored in file, not user supplied formulas. The formulas displayed in the GUI is not the same as formula stored in the file. Several examples:
-* The IFS function is a part of future functions. In the file, it is stored as `_xlfn.IFS`, but user sees `IFS`
-* In the structured references, user sees @ as an indication that structured references this row, but in reality it is a specifier `[#This Row]`
+* __Performance__: ClosedXML must parse formulas fast and with few allocations.
+* __Evaluation__: The parser creates an abstract syntax tree, not a concrete syntax tree. The goal is the evaluation of formulas.
+* __Multi-use__: Formulas are mostly in cells, but other parts of a workbook have formulas with different grammar rules, for example sparklines and data validation.
+* __A1 and R1C1 notation__: The parser reads formulas in A1 and R1C1 notation. For example, `SUM(R5)` is the sum of cell `R5` in A1 notation, but the sum of row 5 in R1C1 notation.
 
-Therefore:
-* External references are accepted only in form of an index to an external file (e.g. `[5]`)
-* There are several formula implementations out there with slighly different grammar incompatible with OOXML formulas (`[1]!'Some name in external wb'`). They are out of scope of the project.
+## Design
 
-# Why not use XLParser
+The official source of the grammar is [MS-XLSX](https://learn.microsoft.com/en-us/openspecs/office_standards/ms-xlsx/2c5dee00-eff2-4b22-92b6-0738acd4475e), chapter 2.2.2 Formulas. A copy is in [MS-XLSX-parser-grammar.abnf](MS-XLSX-parser-grammar.abnf). A parser generator can not use this grammar directly: it has ambiguities, and its rules do not show the operator precedence.
 
-ClosedXML is currently using [XLParser](https://github.com/spreadsheetlab/XLParser) and transforming the concrete syntax tree to abstract syntax tree.
+The ANTLR4 grammar in `src/ClosedXML.ANTLR` is the source of truth for the lexer and the parser:
 
-* Speed:
-  * Grammar extensively uses regexps extensively. Regexs are slow, especially for NET4x target, allocates extra memory. XLParser takes up _47_ seconds for Enron dataset on .NET Framework. .NET teams had made massive improvements on regexs, so it takes only _16_ seconds on NET7.
-  * IronParser needs to determine all possible tokens after every token, that is problematic, even with the help of `prefix` hints.
-* AST: XLParser creates concentrates on creation of concrete syntax tree, but for ClosedXML, we need abstract syntax tree for evaluation. IronParser is not very friendly in that regard
-* ~~XLParser uses `IronParser`, an unmaintained project~~ (IronParser recently released version 1.2).
-* Doesn't have support for lambdas and R1C1 style.
+* __Lexer__: Rolex generates a DFA lexer from the ANTLR lexer grammar (see [Generate the lexer](#generate-the-lexer)). It is approximately two times faster than the ANTLR lexer.
+* __Parser__: `FormulaParser` is a recursive descent parser. It follows the rules of the ANTLR parser grammar, but it does not use ANTLR at runtime.
+* __Pratt parser__: `src/ClosedXML.Parser/Pratt` has an experimental Pratt parser. It does not parse all formulas yet, and the library does not use it.
 
-ANTLR lexer takes up about 3.2 seconds for Enron dataset. With ANTLR parsing, it takes up 11 seconds. I want that 7+ seconds in performance and no allocation, so RDS that takes up 700 ms.
+### Performance
 
-## Debugging
+The ENRON data set has 946320 formulas. The recursive descent parser with the DFA lexer parses them in approximately 1.8 seconds in Release mode. That is approximately 2 μs for each formula.
 
-Use [vscode-antlr4](https://github.com/mike-lischke/vscode-antlr4/blob/master/doc/grammar-debugging.md) plugin for debugging the grammar.
+### Limitations
 
-## Testing strategy
+The primary goal is to parse the formulas in a file, not the formulas that a user types. The formula in the file is not always the same as the formula that Excel shows. For example:
 
-* Each token that contains some data that are extracted for a node (e.g. `A1_REFERENCE` `C5` to `row 5`, `column 3`) has a separate test class in `Lexers` directory with a `{TokenPascalName}TokenTests.cs`
-* Each parser rule has a test class in `Rules` directory. It should contain all possible combinatins of a rule and comparing it with the AST nodes.
-* Data set tests are in `DataSetTests.cs`. Each test tries to parse formula and ensures that **ANTLR** can parse it RDS can and can't parse a formula when **ANTLR** can't. There is no check of the output, just that formulas can be parsed. Data are contained in a `data` directory in CSV format with a one column.
+* The `IFS` function is a future function. The file has `_xlfn.IFS`, but the user sees `IFS`.
+* In a structured reference, the user sees `@` for the current row. The file has the `[#This Row]` specifier.
 
-## Rolex
+Thus:
 
-Rolex is a DFA based lexer released under MIT license (see [Rolex: Unicode Enabled Lexer Generator in C#
-](https://www.codeproject.com/Articles/5257489/Rolex-Unicode-Enabled-Lexer-Generator-in-Csharp)). ANTLR is still the source of truth, but it is used to generate Rolex grammar and then DFA for a lexer.
+* An external reference must use the index of an external file, for example `[5]`.
+* Other formula grammars, for example `[1]!'Some name in external wb'`, are out of scope.
 
-It is rather complicated, but two times faster than ANTLR lexer (1.9 us vs 3.676 us per formula).
+## Development
 
-## Generate lexer
+`AGENTS.md` gives the rules for each change, and the commands to build, test and check the code. The short form:
 
-Prepare rolex grammars
-* Run Antlr2Rolex over FormulaLexer.g4 with A1 version to *ClosedXML.Parser\Rolex\LexerA1.rl*
-* Add `/*` at the beginning of *Local A1 References* section. It comments out A1_REFERENCE and all its fragments
-* Remove `/*` at the beinning of *Local R1C1 References* section. It contains a different tokens for A1_REFERENCE and its fragments
-* Run Antlr2Rolex over FormulaLexer.g4 with R1C1 version to *ClosedXML.Parser\Rolex\LexerR1C1.rl*
+```bash
+dotnet build ClosedXML.Parser.slnx --configuration Release
+```
 
-Fix Rolex generator
-* Fix bug in Rolex generator that doesn't recognize property \u1234 (just add `pc.Advance()` to FFA.cs `_ParseEscapePart` and `_ParseRangeEscapePart`]
+```bash
+dotnet test src/ClosedXML.Parser.Tests/ClosedXML.Parser.Tests.csproj --configuration Release --no-build
+```
 
-Generate a DFA through Rolex
-* `Rolex.exe ClosedXML.Parser\Rolex\LexerA1.rl /noshared /output ClosedXML.Parser\Rolex\RolexA1Dfa.cs /namespace ClosedXML.Parser.Rolex`
-* `Rolex.exe ClosedXML.Parser\Rolex\LexerR1C1.rl /noshared /output ClosedXML.Parser\Rolex\RolexR1C1Dfa.cs /namespace ClosedXML.Parser.Rolex`
+The base branch is `develop`. The CI workflow builds and tests each pull request to `develop`. A person starts the release workflow on `develop`.
 
-# TODO
+### Testing strategy
 
-* Lexer generation during build
-* Fuzzer
-* PR to Rolex to fix unicode bug.
+* Each token with data for a node (for example, `A1_CELL` `C5` gives row 5 and column 3) has a test class in the `Lexers` folder with the name `{TokenPascalName}TokenTests.cs`.
+* Each parser rule has a test class in the `Rules` folder. The test class has the combinations of the rule, and it compares the result with the AST nodes.
+* `DataSetTests.cs` has the data set tests. Each test makes sure that the parser can parse a formula when ANTLR can parse it, and that the parser can not parse a formula when ANTLR can not parse it. The tests do not check the AST. The data is in CSV files with one column in the `data` folder.
 
-# Resources
+Use the [vscode-antlr4](https://github.com/mike-lischke/vscode-antlr4/blob/master/doc/grammar-debugging.md) extension to debug the ANTLR grammar.
 
-* [MS-XML](https://learn.microsoft.com/en-us/openspecs/office_standards/ms-xlsx/2c5dee00-eff2-4b22-92b6-0738acd4475e)
-* [Simplified XLParser grammar](https://github.com/spreadsheetlab/XLParser/blob/master/doc/ebnf.pdf) and [tokens](https://github.com/spreadsheetlab/XLParser/blob/master/doc/tokens.pdf).
+### Generate the lexer
+
+[Rolex](https://www.codeproject.com/Articles/5257489/Rolex-Unicode-Enabled-Lexer-Generator-in-Csharp) is a DFA lexer generator with the MIT license. Antlr2Rolex makes a Rolex grammar from the ANTLR grammar, and Rolex makes the DFA.
+
+Prepare the Rolex grammars:
+
+1. Run Antlr2Rolex on `src/ClosedXML.ANTLR/FormulaLexer.g4` with the A1 version. Write the result to `src/ClosedXML.Parser/Rolex/LexerA1.rl`.
+2. Add `/*` at the start of the *Local A1 References* section. This removes `A1_REFERENCE` and all its fragments.
+3. Remove `/*` at the start of the *Local R1C1 References* section. This section has different tokens for `A1_REFERENCE` and its fragments.
+4. Run Antlr2Rolex on `src/ClosedXML.ANTLR/FormulaLexer.g4` with the R1C1 version. Write the result to `src/ClosedXML.Parser/Rolex/LexerR1C1.rl`.
+
+Fix the Rolex generator: Rolex does not read the `\u1234` escape (a Unicode escape with four hex digits) correctly. Add `pc.Advance()` to `_ParseEscapePart` and `_ParseRangeEscapePart` in `FFA.cs`.
+
+Generate the DFA with Rolex:
+
+```
+Rolex.exe src\ClosedXML.Parser\Rolex\LexerA1.rl /noshared /output src\ClosedXML.Parser\Rolex\RolexA1Dfa.cs /namespace ClosedXML.Parser.Rolex
+Rolex.exe src\ClosedXML.Parser\Rolex\LexerR1C1.rl /noshared /output src\ClosedXML.Parser\Rolex\RolexR1C1Dfa.cs /namespace ClosedXML.Parser.Rolex
+```
+
+## Resources
+
+* [MS-XLSX](https://learn.microsoft.com/en-us/openspecs/office_standards/ms-xlsx/2c5dee00-eff2-4b22-92b6-0738acd4475e), chapter 2.2.2 Formulas
+* [Simplified XLParser grammar](https://github.com/spreadsheetlab/XLParser/blob/master/doc/ebnf.pdf) and [tokens](https://github.com/spreadsheetlab/XLParser/blob/master/doc/tokens.pdf)
 * [Getting Started With ANTLR in C#](https://tomassetti.me/getting-started-with-antlr-in-csharp/)
