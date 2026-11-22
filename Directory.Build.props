@@ -3,7 +3,7 @@
        free patch version for the major.minor and gives it as VersionPrefix. A local build is major.minor.0.
        Add VersionSuffix, for example "preview", to release a prerelease version. -->
   <PropertyGroup>
-    <VersionMajorMinor>2.0</VersionMajorMinor>
+    <VersionMajorMinor>3.0</VersionMajorMinor>
     <VersionPrefix Condition="'$(VersionPrefix)' == ''">$(VersionMajorMinor).0</VersionPrefix>
     <VersionSuffix></VersionSuffix>
     <Version Condition="'$(VersionSuffix)' != ''">$(VersionPrefix)-$(VersionSuffix)</Version>
