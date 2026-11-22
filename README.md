@@ -6,7 +6,7 @@ This repository is a fork of [ClosedXML.Parser](https://github.com/ClosedXML/Clo
 
 ## Package
 
-The release workflow publishes the `ClosedXML.Parser` package to GitHub Packages of this repository. The package targets `net10.0`.
+The release workflow publishes the `ClosedXML.Parser` package to the GitHub Packages NuGet feed of BitBindle. The package targets `net10.0`.
 
 To use the package, add the feed to your `nuget.config`:
 
@@ -35,7 +35,7 @@ The library also has these helpers:
 * `ReferenceParser` parses a reference, for example `Sheet1!A1:B2`.
 * `NameUtils` finds when a sheet name needs quotes in a formula.
 
-The `ClosedXML.Parser.Ast` project has a simple AST and a factory. The tests use it, and it is a good example of a factory.
+The `ClosedXML.Parser.Ast` project has a simple AST and a factory. The tests use it. It shows how to implement `IAstFactory`.
 
 ## Goals
 
@@ -88,7 +88,8 @@ The base branch is `develop`. The CI workflow builds and tests each pull request
 
 * Each token with data for a node (for example, `A1_CELL` `C5` gives row 5 and column 3) has a test class in the `Lexers` folder with the name `{TokenPascalName}TokenTests.cs`.
 * Each parser rule has a test class in the `Rules` folder. The test class has the combinations of the rule, and it compares the result with the AST nodes.
-* `DataSetTests.cs` has the data set tests. Each test makes sure that the parser can parse a formula when ANTLR can parse it, and that the parser can not parse a formula when ANTLR can not parse it. The tests do not check the AST. The data is in CSV files with one column in the `data` folder.
+* `DataSetTests.cs` has the data set tests. Each test parses each formula in `data/<set>/formulas.csv`. The parse must fail for the formulas in the known-fails files of the set, and it must not fail for the other formulas. The tests do not check the AST. The CSV files have one column.
+* `AntlrCompatibilityTests.cs` makes sure that the Rolex lexer gives the same tokens as the ANTLR lexer.
 
 Use the [vscode-antlr4](https://github.com/mike-lischke/vscode-antlr4/blob/master/doc/grammar-debugging.md) extension to debug the ANTLR grammar.
 

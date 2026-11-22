@@ -65,7 +65,7 @@ jobs:
 
       - name: Build
         # VersionPrefix is major.minor.patch. Directory.Build.props gives the suffix. The RepositoryUrl
-        # parameter links the package to this repository. Directory.Build.props has the upstream URL.
+        # parameter makes sure that the package links to the repository that runs the workflow.
         run: >
           dotnet build ClosedXML.Parser.slnx --configuration Release --no-restore
           -p:VersionPrefix="${version%%-*}"
