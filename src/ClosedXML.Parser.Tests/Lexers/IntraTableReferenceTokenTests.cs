@@ -9,7 +9,6 @@ public class IntraTableReferenceTokenTests
     public void Token_data_are_extracted_and_unescaped(string tokenText, StructuredReferenceArea expectedArea, string expectedFirstColumn, string expectedLastColumn)
     {
         AssertFormula.AssertTokenType(tokenText, FormulaLexer.INTRA_TABLE_REFERENCE);
-        // An empty column is no column.
         TokenParser.ParseIntraTableReference(tokenText, out var area, out var firstColumn, out var lastColumn);
 
         Assert.Equal(expectedArea, area);
@@ -21,6 +20,7 @@ public class IntraTableReferenceTokenTests
     {
         get
         {
+            // An empty span is no column, so the expected text of no column is empty.
             // Portions area
             // INTRA_TABLE_REFERENCE : KEYWORD
             yield return new object?[] { "[#All]", StructuredReferenceArea.All, "", "" };
