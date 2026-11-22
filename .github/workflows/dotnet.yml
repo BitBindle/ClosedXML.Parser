@@ -19,10 +19,10 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: 8.0.x
+        dotnet-version: 10.0.x
     - name: Restore dependencies
-      run: dotnet restore src/ClosedXML.Parser.sln
+      run: dotnet restore ClosedXML.Parser.slnx
     - name: Build
-      run: dotnet build --no-restore src/ClosedXML.Parser.sln
+      run: dotnet build --no-restore ClosedXML.Parser.slnx
     - name: Test
-      run: dotnet test --no-build --verbosity normal src/ClosedXML.Parser.sln
+      run: dotnet test --no-build --verbosity normal ClosedXML.Parser.slnx

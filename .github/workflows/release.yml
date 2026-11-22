@@ -29,13 +29,13 @@ jobs:
         uses: actions/setup-dotnet@v4
 
       - name: Restore dependencies
-        run: dotnet restore src/ClosedXML.Parser.sln
+        run: dotnet restore ClosedXML.Parser.slnx
 
       - name: Build ClosedXML.Parser
-        run: dotnet build ./src/ClosedXML.Parser.sln --configuration Release --no-restore
+        run: dotnet build ClosedXML.Parser.slnx --configuration Release --no-restore
 
       - name: Run tests
-        run: dotnet test ./src/ClosedXML.Parser.sln --configuration Release --no-restore --no-build 
+        run: dotnet test ClosedXML.Parser.slnx --configuration Release --no-restore --no-build 
 
   create_nuget:
     runs-on: ubuntu-latest

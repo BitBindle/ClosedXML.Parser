@@ -1,11 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>netstandard2.0;netstandard2.1</TargetFrameworks>
-    <LangVersion>10</LangVersion>
-    <Nullable Condition="'$(TargetFramework)' == 'netstandard2.1'">enable</Nullable>
-    <Nullable Condition="'$(TargetFramework)' == 'netstandard2.0'">annotations</Nullable>
-    <Authors>Jan Havlíček</Authors>
     <PackageId>ClosedXML.Parser</PackageId>
     <PackageTags>ClosedXML;parser;formula;xlsx</PackageTags>
     <Description>
@@ -13,10 +8,6 @@
       an abstract syntax tree from a formula text to enable formula evaluation.
     </Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/ClosedXML/ClosedXML.Parser</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/ClosedXML/ClosedXML.Parser</RepositoryUrl>
-    <RepositoryType>git</RepositoryType>
     <PackageVersion>2.0.0</PackageVersion>
   </PropertyGroup>
 
@@ -29,11 +20,7 @@
     <Optimize>true</Optimize>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
-    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
-  </PropertyGroup>
-
-  <!-- Include symbols for .snupkg package -->
+  <!-- Include symbols for .snupkg package. The .NET 8 SDK and later include Source Link. -->
   <PropertyGroup>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <IncludeSymbols>true</IncludeSymbols>
@@ -44,19 +31,8 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
-  <PropertyGroup>
-    <SignAssembly>true</SignAssembly>
-    <AssemblyOriginatorKeyFile>../ClosedXML.Parser.snk</AssemblyOriginatorKeyFile>
-  </PropertyGroup>
-
   <ItemGroup>
     <None Include="../../README.md" Pack="true" PackagePath="\" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="JetBrains.Annotations" Version="2023.3.0" PrivateAssets="All" />
-    <PackageReference Include="System.Memory" Version="4.5.4" Condition="'$(TargetFramework)' == 'netstandard2.0'" />
-    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.0.0" PrivateAssets="All" />
   </ItemGroup>
 
   <!-- Lexer isn't CLS compliant thus neither should be the assembly.  -->

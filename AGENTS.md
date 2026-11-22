@@ -9,14 +9,15 @@ ClosedXML.Parser is a .NET library that parses Excel formulas into an abstract s
 
 | Project | Content |
 | --- | --- |
-| `ClosedXML.Parser` | The library: the lexer, the parser and the formula converters. Targets `netstandard2.0` and `netstandard2.1`. |
-| `ClosedXML.Parser.Ast` | AST nodes and an AST factory. The tests use them. Targets `net8.0`. |
-| `ClosedXML.ANTLR` | The ANTLR grammar of the lexer and the parser, and a console application for manual experiments. Targets `net8.0`. |
-| `ClosedXML.Parser.Tests` | xUnit tests. Targets `net8.0`. |
-| `ClosedXML.Parser.Function` | Azure function for the AST visualizer. Targets `net8.0`. |
+| `ClosedXML.Parser` | The library: the lexer, the parser and the formula converters. |
+| `ClosedXML.Parser.Ast` | AST nodes and an AST factory. The tests use them. |
+| `ClosedXML.ANTLR` | The ANTLR grammar of the lexer and the parser, and a console application for manual experiments. |
+| `ClosedXML.Parser.Tests` | xUnit tests. |
+| `ClosedXML.Parser.Function` | Azure function for the AST visualizer. It uses the isolated worker model. |
 | `ClosedXML.Parser.Web` | Static web page of the AST visualizer. It is not a .NET project. |
 
-The projects are in the `src` folder.
+The projects are in the `src` folder. All .NET projects target `net10.0`.
+`Directory.Build.props` holds the shared project settings.
 Antlr2Rolex and Rolex generate the lexer in `src/ClosedXML.Parser/Rolex` from `src/ClosedXML.ANTLR/FormulaLexer.g4`.
 
 The base branch is `develop`.
@@ -28,7 +29,7 @@ Do these steps before the review gate. The commands are based on `.github/workfl
 1. Build the solution:
 
    ```bash
-   dotnet build src/ClosedXML.Parser.sln --configuration Release
+   dotnet build ClosedXML.Parser.slnx --configuration Release
    ```
 
 2. Run the tests with coverage:
@@ -36,9 +37,6 @@ Do these steps before the review gate. The commands are based on `.github/workfl
    ```bash
    dotnet test src/ClosedXML.Parser.Tests/ClosedXML.Parser.Tests.csproj --configuration Release --no-build --collect "Code Coverage;Format=cobertura" --results-directory test-results
    ```
-
-   The tests use only the `netstandard2.1` build of `ClosedXML.Parser`. No step tests the `netstandard2.0` build.
-   Issue #4 removes the .NET Standard targets.
 
 3. Measure the line coverage of the new code from the Cobertura report. For example, use `diff-cover` against `origin/develop`.
 4. Run the text check:
@@ -95,7 +93,6 @@ You can find a problem that the change did not cause.
 
 - Use `Span<T>`, `ReadOnlySpan<T>`, `Memory<T>`, `stackalloc` and `ArrayPool<T>` where they remove an allocation or a copy on a hot path. Examples of hot paths are parsers, converters and serializers.
 - Do not use them where they only make the code harder to read.
-- On `netstandard2.0`, the `System.Memory` package and its dependency `System.Buffers` supply these types.
 
 ### Async code
 

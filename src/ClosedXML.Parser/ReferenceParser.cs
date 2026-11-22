@@ -1,5 +1,4 @@
 ﻿using ClosedXML.Parser.Rolex;
-using JetBrains.Annotations;
 using System;
 using System.Collections.Generic;
 
@@ -25,7 +24,6 @@ public static class ReferenceParser
     /// <param name="sheetName">The unescaped name of a sheet for sheet reference, <c>null</c> for local reference.</param>
     /// <param name="area">The parsed reference area.</param>
     /// <returns><c>true</c> if parsing was a success, <c>false</c> otherwise.</returns>
-    [PublicAPI]
     public static bool TryParseA1(string text, out string? sheetName, out ReferenceArea area)
     {
         if (text is null)
@@ -55,7 +53,6 @@ public static class ReferenceParser
     /// <param name="text">Text to parse.</param>
     /// <param name="area">Parsed area.</param>
     /// <returns><c>true</c> if parsing was a success, <c>false</c> otherwise.</returns>
-    [PublicAPI]
     public static bool TryParseA1(string text, out ReferenceArea area)
     {
         if (text is null)
@@ -76,7 +73,6 @@ public static class ReferenceParser
     /// Doesn't allow any whitespaces or extra values inside.
     /// </summary>
     /// <exception cref="ParsingException">Invalid input.</exception>
-    [PublicAPI]
     public static ReferenceArea ParseA1(string text)
     {
         if (!TryParseA1(text, out var area))
@@ -102,7 +98,6 @@ public static class ReferenceParser
     /// <param name="sheetName">Name of the sheet, unescaped (e.g. the sheetName will contain <c>Jane's</c> for <c>'Jane''s'!A1</c>).</param>
     /// <param name="area">Parsed reference.</param>
     /// <returns><c>true</c> if parsing was a success, <c>false</c> otherwise.</returns>
-    [PublicAPI]
     public static bool TryParseSheetA1(string text, out string sheetName, out ReferenceArea area)
     {
         if (text is null)
@@ -123,7 +118,6 @@ public static class ReferenceParser
     /// <param name="sheetName">The unescaped name of a sheet for sheet name, <c>null</c> for a name.</param>
     /// <param name="name">The parsed name.</param>
     /// <returns><c>true</c> if parsing was a success, <c>false</c> otherwise.</returns>
-    [PublicAPI]
     public static bool TryParseName(string text, out string? sheetName, out string name)
     {
         if (text is null)
@@ -150,7 +144,6 @@ public static class ReferenceParser
     /// <param name="sheetName">Parsed sheet name, unescaped.</param>
     /// <param name="name">Parsed defined name.</param>
     /// <returns><c>true</c> if parsing was a success, <c>false</c> otherwise.</returns>
-    [PublicAPI]
     public static bool TryParseSheetName(string text, out string sheetName, out string name)
     {
         if (text is null)

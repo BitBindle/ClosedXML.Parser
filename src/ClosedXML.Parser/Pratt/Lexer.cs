@@ -407,7 +407,8 @@ internal class Lexer
 
         static bool IsLetterOrLetterMark(int codepoint)
         {
-            // TODO: Only netstandard 2.1 has a parameter of type int, 2.0 has only char.
+            // TODO: A code point above U+FFFF is never a letter here. CharUnicodeInfo.GetUnicodeCategory(int) can
+            // give the category of such a code point, but the change must also match the Rolex lexer.
             if (codepoint > 0xFFFF)
                 return false; // No letters from astral planes for us :(
 

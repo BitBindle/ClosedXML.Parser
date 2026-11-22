@@ -1,24 +1,25 @@
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Azure.WebJobs;
-using Microsoft.Azure.WebJobs.Extensions.Http;
+using System;
+using System.Text.Json;
+using System.Threading;
 using Microsoft.AspNetCore.Http;
-using Newtonsoft.Json;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Azure.Functions.Worker;
 
 namespace ClosedXML.Parser.Function
 {
     public static class ParseFormula
     {
-        [FunctionName("parse-formula")]
-        public static Task<IActionResult> Run(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = null)] HttpRequest req)
+        [Function("parse-formula")]
+        public static IActionResult Run(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = null)] HttpRequest req,
+            CancellationToken cancellationToken)
         {
             var refStyle = req.Query["style"] == "R1C1" ? ReferenceStyle.R1C1 : ReferenceStyle.A1;
-            string formulaText = req.Query["formula"];
+            string formulaText = req.Query["formula"].ToString();
 
-            var serializerSetting = new JsonSerializerSettings
+            var serializerOptions = new JsonSerializerOptions
             {
-                Formatting = Formatting.Indented,
+                WriteIndented = true,
                 Converters = { new AstNodeConverter(refStyle) }
             };
 
@@ -27,25 +28,38 @@ namespace ClosedXML.Parser.Function
                 var nodes = refStyle == ReferenceStyle.A1
                     ? FormulaParser<ScalarValue, AstNode, Ctx>.CellFormulaA1(formulaText, new Ctx(), new F())
                     : FormulaParser<ScalarValue, AstNode, Ctx>.CellFormulaR1C1(formulaText, new Ctx(), new F());
-                return Task.FromResult<IActionResult>(new JsonResult(new
+
+                // The default maximum JSON depth is 64. A chain of binary operators makes a deep AST, and each AST
+                // level uses two JSON levels: the node object and its children array. The root object uses one level.
+                serializerOptions.MaxDepth = 2 * GetDepth(nodes) + 1;
+                return new JsonResult(new
                 {
                     formula = formulaText,
                     style = refStyle.ToString(),
                     ast = nodes
-                }, serializerSetting));
+                }, serializerOptions);
             }
             catch (ParsingException e)
             {
-                return Task.FromResult<IActionResult>(new JsonResult(new
+                return new JsonResult(new
                 {
                     formula = formulaText,
                     style = refStyle.ToString(),
                     error = e.Message
-                }, serializerSetting)
+                }, serializerOptions)
                 {
                     StatusCode = StatusCodes.Status422UnprocessableEntity
-                });
+                };
             }
+        }
+
+        private static int GetDepth(AstNode node)
+        {
+            var childDepth = 0;
+            foreach (var child in node.Children)
+                childDepth = Math.Max(childDepth, GetDepth(child));
+
+            return childDepth + 1;
         }
     }
 }
