@@ -32,6 +32,37 @@ internal class RolexLexer
         return GetTokens(formula, RolexR1C1Dfa.DfaTable);
     }
 
+    /// <summary>
+    /// Get the first tokens of a formula into <paramref name="tokens"/>. Use A1 semantic. The
+    /// lexer stops when the buffer is full. If the buffer becomes full before the end of the
+    /// formula, the last token is not EOF.
+    /// </summary>
+    /// <param name="formula">Formula to parse.</param>
+    /// <param name="tokens">The buffer for the tokens.</param>
+    /// <returns>The number of tokens in the buffer.</returns>
+    public static int GetTokensA1(ReadOnlySpan<char> formula, Span<Token> tokens)
+    {
+        var count = 0;
+        for (var i = 0; i < formula.Length;)
+        {
+            if (count == tokens.Length)
+                return count;
+
+            var (symbolId, length) = GetToken(formula, i, RolexA1Dfa.DfaTable);
+            tokens[count++] = new Token(symbolId, i, length);
+            if (symbolId < 0)
+                return count;
+
+            i += length;
+        }
+
+        if (count == tokens.Length)
+            return count;
+
+        tokens[count++] = Token.EofSymbol(formula.Length);
+        return count;
+    }
+
     private static List<Token> GetTokens(ReadOnlySpan<char> formula, DfaEntry[] lexerDfa)
     {
         var tokens = new List<Token>(GetInitialCapacity(formula.Length));
