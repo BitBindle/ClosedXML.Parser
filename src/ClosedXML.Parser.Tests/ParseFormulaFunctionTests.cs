@@ -100,6 +100,25 @@ public class ParseFormulaFunctionTests
         Assert.Equal(99, CountNodes(json.RootElement.GetProperty("ast"), "+"));
     }
 
+    [Fact]
+    [Trait("Issue", "23")]
+    public void Requests_with_same_style_and_similar_depth_use_same_serializer_options()
+    {
+        // Serializer options cache the type metadata, thus a new instance for each request is slow.
+        var a1 = Run("?formula=A1").SerializerSettings;
+        var sum = Run("?formula=SUM(A1,1)").SerializerSettings;
+        var error = Run("?formula=SUM(").SerializerSettings;
+        var r1c1 = Run("?formula=R1C1&style=R1C1").SerializerSettings;
+        var deep = (JsonSerializerOptions)Run("?formula=" + Uri.EscapeDataString(string.Join("+", Enumerable.Repeat("A1", 100)))).SerializerSettings!;
+
+        Assert.Same(a1, sum);
+        Assert.Same(a1, error);
+        Assert.NotSame(a1, r1c1);
+        Assert.NotSame(a1, deep);
+        Assert.Equal(64, ((JsonSerializerOptions)a1!).MaxDepth);
+        Assert.Equal(256, deep.MaxDepth);
+    }
+
     private static int CountNodes(JsonElement node, string content)
     {
         var count = node.GetProperty("content").GetString() == content ? 1 : 0;

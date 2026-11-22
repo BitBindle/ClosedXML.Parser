@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Buffers;
 using System.Collections;
 using System.Linq;
 using System.Text;
@@ -40,8 +41,8 @@ public static class NameUtils
     /// <summary>
     /// Character not allowed in a sheet name, even quoted one.
     /// </summary>
-    private static readonly char[] InvalidSheetChars =
-    {
+    private static readonly SearchValues<char> InvalidSheetChars = SearchValues.Create(
+    [
         '*', // 0x002A
         '/', // 0x002F
         ':', // 0x003A
@@ -49,7 +50,7 @@ public static class NameUtils
         '[', // 0x005B
         '\\',// 0x005C
         ']', // 0x005D
-    };
+    ]);
 
     /// <summary>
     /// Should the name be quoted?
@@ -224,7 +225,7 @@ public static class NameUtils
     internal static StringBuilder EscapeName(StringBuilder sb, string sheet)
     {
         return ShouldQuote(sheet.AsSpan())
-            ? sb.Append('\'').Append(sheet).Replace("'", "''", 1, sheet.Length).Append('\'')
+            ? sb.Append('\'').AppendEscapedSheetName(sheet).Append('\'')
             : sb.Append(sheet);
     }
 }

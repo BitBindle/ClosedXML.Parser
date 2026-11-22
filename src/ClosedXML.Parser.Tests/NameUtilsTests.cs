@@ -1,5 +1,6 @@
 ﻿using System.Collections;
 using System.Globalization;
+using System.Text;
 using Xunit.Abstractions;
 
 namespace ClosedXML.Parser.Tests;
@@ -11,6 +12,20 @@ public class NameUtilsTests
     public NameUtilsTests(ITestOutputHelper output)
     {
         _output = output;
+    }
+
+    [Theory]
+    [Trait("Issue", "23")]
+    [InlineData("", "O'Brien", "'O''Brien'")]
+    [InlineData("=SUM(", "O'Brien", "=SUM('O''Brien'")]
+    [InlineData("'", "a''b", "''a''''b'")]
+    [InlineData("=SUM(", "Sheet", "=SUM(Sheet")]
+    public void Escape_name_doubles_only_quotes_of_appended_name(string text, string sheet, string expected)
+    {
+        // The builder can contain text before the name, and the method must not change that text.
+        var sb = NameUtils.EscapeName(new StringBuilder(text), sheet);
+
+        Assert.Equal(expected, sb.ToString());
     }
 
     [Theory]
