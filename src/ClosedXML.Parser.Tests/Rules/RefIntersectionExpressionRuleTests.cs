@@ -36,7 +36,7 @@ public class RefIntersectionExpressionRuleTests
     [InlineData("A1 #REF!")]
     public void Line_break_is_not_intersection_operator(string formulaWithSpace)
     {
-        // The lexer accepts only a space as the operator, not a line break.
+        // The parser accepts only a space as the operator, not a line break.
         AssertFormula.CheckParsingErrorContains(formulaWithSpace.Replace(' ', '\n'), "wasn't parsed correctly");
     }
 

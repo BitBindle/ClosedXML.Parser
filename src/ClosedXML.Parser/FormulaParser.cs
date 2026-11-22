@@ -444,9 +444,10 @@ public class FormulaParser<TScalarValue, TNode, TContext>
     /// </summary>
     /// <remarks>
     /// The lexer gives a SPACE token only for a space that no other token takes. The tokens
-    /// OPEN_BRACE, CLOSE_BRACE, SPILL and INTRA_TABLE_REFERENCE can include the whitespaces
-    /// around them. Thus the space of the operator can be in the previous token, as in
-    /// <c>(A1) B1</c>, or in the current token, as in <c>A1 (B1)</c> and <c>A1 #REF!</c>.
+    /// OPEN_BRACE, CLOSE_BRACE, SPILL, SINGLE_SHEET_PREFIX and INTRA_TABLE_REFERENCE can include
+    /// the whitespaces around them. Thus the space of the operator can be in the previous token,
+    /// as in <c>(A1) B1</c> and <c>#REF! B1</c>, or in the current token, as in <c>A1 (B1)</c>
+    /// and <c>A1 #REF!</c>.
     /// </remarks>
     private bool IsIntersectionOperator()
     {
