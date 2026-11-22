@@ -706,8 +706,9 @@ public class FormulaParser<TScalarValue, TNode, TContext>
                         return _factory.StructureReference(_context, range, localName, specifics, firstColumn, lastColumn.IsEmpty ? firstColumn : lastColumn);
                     }
 
-                    // 3D reference
-                    if (_la == Token.COLON && LL(1) == Token.SINGLE_SHEET_PREFIX)
+                    // 3D reference. A name with a char that is not valid in an unquoted sheet name,
+                    // for example `\a:b!A1`, is not a sheet. It is a name in a range operation.
+                    if (_la == Token.COLON && LL(1) == Token.SINGLE_SHEET_PREFIX && NameUtils.IsUnquotedSheetName(localName))
                     {
                         var firstSheetName = localName;
                         Consume(); // COLON

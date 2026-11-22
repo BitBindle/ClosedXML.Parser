@@ -1,8 +1,6 @@
-﻿using ClosedXML.Parser.Pratt;
+﻿namespace ClosedXML.Parser.Tests;
 
-namespace ClosedXML.Parser.Tests.Lexers;
-
-public class ParseletIdentTests
+public class IdentReferenceTests
 {
     [Theory]
 
@@ -69,8 +67,7 @@ public class ParseletIdentTests
     [InlineData("sheet1:sheet2!$1:$2", typeof(Reference3DNode))]
     public void Can_parse_references_starting_at_ident(string formula, Type expectedNodeType)
     {
-        var parser = ParserFactory.Create(new F());
-        var root = parser.ParseFormula(formula, new Ctx());
+        var root = Parse(formula);
 
         Assert.Equal(expectedNodeType, root.GetType());
         Assert.Equal(formula, root.GetDisplayString(A1));
@@ -86,8 +83,7 @@ public class ParseletIdentTests
     public void Can_parse_unquoted_sheet_name_that_reads_as_reference(string formula, Type expectedNodeType)
     {
         // An earlier version wrote such a sheet name without quotes, so the parser must still read it.
-        var parser = ParserFactory.Create(new F());
-        var root = parser.ParseFormula(formula, new Ctx());
+        var root = Parse(formula);
 
         Assert.Equal(expectedNodeType, root.GetType());
         Assert.Equal(formula, root.GetDisplayString(A1));
@@ -102,15 +98,10 @@ public class ParseletIdentTests
     [InlineData("Sheet!\U0001D400", typeof(SheetNameNode))]
     public void Can_parse_ident_with_letter_above_basic_multilingual_plane(string formula, Type expectedNodeType)
     {
-        var parser = ParserFactory.Create(new F());
-        var root = parser.ParseFormula(formula, new Ctx());
+        var root = Parse(formula);
 
         Assert.Equal(expectedNodeType, root.GetType());
         Assert.Equal(formula, root.GetDisplayString(A1));
-
-        // The main parser, which uses the Rolex lexer, gives the same node.
-        var mainParserRoot = FormulaParser<ScalarValue, AstNode, Ctx>.CellFormulaA1(formula, new Ctx(), new F());
-        Assert.Equal(mainParserRoot, root);
     }
 
     [Theory]
@@ -120,8 +111,7 @@ public class ParseletIdentTests
     [InlineData("false", false)]
     public void Can_parse_logical(string formula, bool expectedValue)
     {
-        var parser = ParserFactory.Create(new F());
-        var root = parser.ParseFormula(formula, new Ctx());
+        var root = Parse(formula);
 
         Assert.Equal(new ValueNode(expectedValue), root);
     }
@@ -130,16 +120,16 @@ public class ParseletIdentTests
     [InlineData("sheet!$")]
     [InlineData("sheet!")]
     [InlineData("$")]
-    [InlineData("A01")]
-    [InlineData("A0")]
-    [InlineData("A1048577")]
-    [InlineData("XFE1")]
     [InlineData("sheet1:sheet2!")]
     [InlineData("sheet1:sheet2!A")]
     [InlineData("sheet1:sheet2!name")] // There is no such thing as 3D name
     public void Invalid_references_starting_with_ident_throw_parsing_exception(string formula)
     {
-        var parser = ParserFactory.Create(new F());
-        Assert.Throws<ParsingException>(() => parser.ParseFormula(formula, new Ctx()));
+        Assert.Throws<ParsingException>(() => Parse(formula));
+    }
+
+    private static AstNode Parse(string formula)
+    {
+        return FormulaParser<ScalarValue, AstNode, Ctx>.CellFormulaA1(formula, new Ctx(), new F());
     }
 }

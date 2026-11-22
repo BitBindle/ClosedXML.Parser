@@ -74,9 +74,8 @@ public static class NameUtils
     /// Does the name contain a character that needs quotes?
     /// </summary>
     /// <remarks>
-    /// The Pratt parser uses this method to find a sheet name without quotes. It does not
-    /// use <see cref="ShouldQuote"/>, because it must also read a name such as <c>RC</c>
-    /// that an earlier version wrote without quotes.
+    /// The writer uses this method. It quotes more sheet names than the parser needs, because
+    /// Excel also quotes them. The parser uses <see cref="IsUnquotedSheetName"/>.
     /// </remarks>
     /// <exception cref="ArgumentException">If name is empty.</exception>
     internal static bool HasCharacterThatNeedsQuotes(ReadOnlySpan<char> name)
@@ -199,27 +198,52 @@ public static class NameUtils
         return sheetName.IndexOfAny(InvalidSheetChars) == -1;
     }
 
-    internal static bool IsNameValid(ReadOnlySpan<char> name)
+    /// <summary>
+    /// Can a formula contain the text as a sheet name without quotes? The rule is the
+    /// <c>SHEET_NAME_CHARACTER</c> fragment of the lexer grammar: tab, LF, CR, <c>"</c>,
+    /// <c>$</c>, <c>.</c>, ASCII digits, <c>;</c>, <c>@</c>, ASCII letters, <c>_</c>, <c>`</c>,
+    /// <c>|</c> and each code point from <c>~</c>. An unpaired surrogate, U+FFFE and U+FFFF are
+    /// not valid.
+    /// </summary>
+    /// <remarks>
+    /// The method does not check the length, because the parser does not check it. A name such
+    /// as <c>A1</c> or <c>RC</c> is valid, because an earlier version wrote such names without
+    /// quotes.
+    /// </remarks>
+    internal static bool IsUnquotedSheetName(ReadOnlySpan<char> text)
     {
-        if (name.Length is < 1 or > 255)
+        if (text.IsEmpty)
             return false;
 
-        // TODO: Determine what is a valid name and make the method public.
-        // Alert box says:
-        // * Starts with a letter or underscore
-        // * no space or char that is not allowed
-        // A letter above U+FFFF is two chars in UTF-16, thus the method reads runes.
-        var isFirst = true;
-        foreach (var rune in name.EnumerateRunes())
+        for (var i = 0; i < text.Length; ++i)
         {
-            var isValid = Rune.IsLetter(rune) || (isFirst && rune.Value == '_');
-            if (!isValid)
-                return false;
+            var c = text[i];
+            if (char.IsHighSurrogate(c) && i + 1 < text.Length && char.IsLowSurrogate(text[i + 1]))
+            {
+                // Each code point above U+FFFF is valid.
+                ++i;
+                continue;
+            }
 
-            isFirst = false;
+            if (!IsUnquotedSheetNameChar(c))
+                return false;
         }
 
         return true;
+
+        static bool IsUnquotedSheetNameChar(char c)
+        {
+            return c switch
+            {
+                '\t' or '\n' or '\r' or '"' or '$' or '.' or ';' or '@' or '|' => true,
+                >= '0' and <= '9' => true,
+                >= 'A' and <= 'Z' => true,
+                >= '_' and <= 'z' => true, // _, ` and a-z
+                >= '~' and < '\uD800' => true,
+                >= '\uE000' and <= '\uFFFD' => true,
+                _ => false,
+            };
+        }
     }
 
     /// <summary>

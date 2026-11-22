@@ -1,9 +1,8 @@
 ﻿using System.Diagnostics;
-using ClosedXML.Parser.Pratt;
 
-namespace ClosedXML.Parser.Tests.Lexers;
+namespace ClosedXML.Parser.Tests.Rules;
 
-public class PrattParserPrecedenceTests
+public class OperatorPrecedenceTests
 {
     [Theory]
     [InlineData("1+2+3+4", "(((1+2)+3)+4)")]
@@ -41,8 +40,7 @@ public class PrattParserPrecedenceTests
 
     private static void AssertSameFormulas(string formula, string normalizedForm)
     {
-        var parser = ParserFactory.Create(new F());
-        var root = parser.ParseFormula(formula, new Ctx());
+        var root = FormulaParser<ScalarValue, AstNode, Ctx>.CellFormulaA1(formula, new Ctx(), new F());
 
         Assert.Equal(normalizedForm, GetNormalizedForm(root));
     }
