@@ -13,7 +13,7 @@ git init --quiet
 git -c user.name=test -c user.email=test@example.com commit --quiet --allow-empty -m base
 mkdir Tests
 
-# Lines that check.sh must report. The CRLF line endings make sure that check.sh accepts them.
+# Lines that check.sh must report. The CRLF line endings make sure that check.sh also reads files that use CRLF.
 printf '%s\r\n' \
     '// #1742 skip the locale prefix' \
     '// Fixes #1234.' \
