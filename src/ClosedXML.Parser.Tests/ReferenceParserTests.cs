@@ -182,6 +182,150 @@ public class ReferenceParserTests
         Assert.Throws<ArgumentNullException>(() => ReferenceParser.TryParseA1(null!, out _, out _));
     }
 
+    #region Span overloads
+
+    [Theory]
+    [Trait("Issue", "22")]
+    [MemberData(nameof(ParseA1TestCases))]
+    public void Span_ParseA1_parses_cell_area_or_rowspan_or_colspan(string text, ReferenceArea expectedReference)
+    {
+        Assert.Equal(expectedReference, ReferenceParser.ParseA1(text.AsSpan()));
+        Assert.True(ReferenceParser.TryParseA1(text.AsSpan(), out var area));
+        Assert.Equal(expectedReference, area);
+    }
+
+    [Fact]
+    [Trait("Issue", "22")]
+    public void Span_ParseA1_throws_on_non_references()
+    {
+        var ex = Assert.Throws<ParsingException>(() => ReferenceParser.ParseA1("HELLO".AsSpan()));
+        Assert.Equal("Unable to parse 'HELLO'.", ex.Message);
+    }
+
+    [Theory]
+    [Trait("Issue", "22")]
+    [MemberData(nameof(ParseA1TestCases))]
+    public void Span_TryParseA1_unified_gives_empty_sheet_for_local_reference(string text, ReferenceArea expectedReference)
+    {
+        var success = ReferenceParser.TryParseA1(text.AsSpan(), out ReadOnlySpan<char> sheet, out var reference);
+        Assert.True(success);
+        Assert.True(sheet.IsEmpty);
+        Assert.Equal(expectedReference, reference);
+    }
+
+    [Theory]
+    [Trait("Issue", "22")]
+    [MemberData(nameof(ParseSheetA1TestCases))]
+    public void Span_TryParseA1_unified_can_parse_sheet_reference(string text, string expectedSheet, ReferenceArea expectedReference)
+    {
+        var success = ReferenceParser.TryParseA1(text.AsSpan(), out ReadOnlySpan<char> sheet, out var reference);
+        Assert.True(success);
+        Assert.Equal(expectedSheet, sheet.ToString());
+        Assert.Equal(expectedReference, reference);
+    }
+
+    [Theory]
+    [Trait("Issue", "22")]
+    [MemberData(nameof(ParseSheetA1TestCases))]
+    public void Span_TryParseSheetA1_accepts_area_or_rowspan_or_colspan_with_sheet(string text, string expectedSheet, ReferenceArea expectedArea)
+    {
+        var success = ReferenceParser.TryParseSheetA1(text.AsSpan(), out ReadOnlySpan<char> sheet, out var area);
+        Assert.True(success);
+        Assert.Equal(expectedSheet, sheet.ToString());
+        Assert.Equal(expectedArea, area);
+    }
+
+    [Theory]
+    [Trait("Issue", "22")]
+    [InlineData("[1]Sheet!A1")]
+    [InlineData("A1")]
+    [InlineData("Sheet!Name")]
+    public void Span_TryParseSheetA1_cant_parse_other_texts(string text)
+    {
+        var success = ReferenceParser.TryParseSheetA1(text.AsSpan(), out ReadOnlySpan<char> sheet, out var area);
+        Assert.False(success);
+        Assert.True(sheet.IsEmpty);
+        Assert.Equal(default, area);
+    }
+
+    [Theory]
+    [Trait("Issue", "22")]
+    [InlineData("Sheet!Name", "Sheet", "Name")]
+    [InlineData("'Hello World'!Data", "Hello World", "Data")]
+    [InlineData("' John''s World! '!Quarter1", " John's World! ", "Quarter1")]
+    public void Span_TryParseName_and_TryParseSheetName_parse_sheet_and_name(string text, string expectedSheet, string expectedName)
+    {
+        Assert.True(ReferenceParser.TryParseName(text.AsSpan(), out ReadOnlySpan<char> sheet, out var name));
+        Assert.Equal(expectedSheet, sheet.ToString());
+        Assert.Equal(expectedName, name.ToString());
+
+        Assert.True(ReferenceParser.TryParseSheetName(text.AsSpan(), out sheet, out name));
+        Assert.Equal(expectedSheet, sheet.ToString());
+        Assert.Equal(expectedName, name.ToString());
+    }
+
+    [Theory]
+    [Trait("Issue", "22")]
+    [InlineData("Name")]
+    [InlineData("some_name")]
+    public void Span_TryParseName_gives_empty_sheet_and_whole_text_for_name(string text)
+    {
+        var success = ReferenceParser.TryParseName(text.AsSpan(), out ReadOnlySpan<char> sheet, out var name);
+        Assert.True(success);
+        Assert.True(sheet.IsEmpty);
+        Assert.Equal(text, name.ToString());
+    }
+
+    [Theory]
+    [Trait("Issue", "22")]
+    [InlineData("A1")]
+    [InlineData("14")]
+    [InlineData("[1]Sheet!Name")]
+    public void Span_TryParseName_and_TryParseSheetName_cant_parse_other_texts(string text)
+    {
+        Assert.False(ReferenceParser.TryParseName(text.AsSpan(), out ReadOnlySpan<char> sheet, out var name));
+        Assert.True(sheet.IsEmpty);
+        Assert.True(name.IsEmpty);
+
+        Assert.False(ReferenceParser.TryParseSheetName(text.AsSpan(), out sheet, out name));
+        Assert.True(sheet.IsEmpty);
+        Assert.True(name.IsEmpty);
+    }
+
+    [Fact]
+    [Trait("Issue", "22")]
+    public void Span_outputs_are_slices_of_text_when_sheet_is_not_escaped()
+    {
+        var text = "'Hello World'!Data".AsSpan();
+        Assert.True(ReferenceParser.TryParseSheetName(text, out ReadOnlySpan<char> sheet, out var name));
+        Assert.True(text.Overlaps(sheet));
+        Assert.True(text.Overlaps(name));
+
+        var escapedText = "'It''s'!A1".AsSpan();
+        Assert.True(ReferenceParser.TryParseSheetA1(escapedText, out ReadOnlySpan<char> escapedSheet, out _));
+        Assert.Equal("It's", escapedSheet.ToString());
+        Assert.False(escapedText.Overlaps(escapedSheet));
+    }
+
+    [Theory]
+    [Trait("Issue", "22")]
+    [InlineData("A1:B2:C3")]
+    [InlineData("Sheet!A1:B2:C3")]
+    [InlineData("Sheet!A1:B2 ")]
+    [InlineData("A1+B1+C1+D1")]
+    [InlineData("Sheet!Name+1")]
+    public void Text_with_more_tokens_than_reference_is_not_parsed(string text)
+    {
+        // The lexer stops after a few tokens, so a long text must not match a short token list.
+        Assert.False(ReferenceParser.TryParseA1(text.AsSpan(), out ReadOnlySpan<char> _, out _));
+        Assert.False(ReferenceParser.TryParseA1(text, out _, out _));
+        Assert.False(ReferenceParser.TryParseSheetA1(text, out _, out _));
+        Assert.False(ReferenceParser.TryParseName(text, out _, out _));
+        Assert.False(ReferenceParser.TryParseSheetName(text, out _, out _));
+    }
+
+    #endregion
+
     public static IEnumerable<object[]> ParseSheetA1TestCases
     {
         get
