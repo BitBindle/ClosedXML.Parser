@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using static ClosedXML.Parser.ReferenceAxisType;
 
 namespace ClosedXML.Parser.Tests;
@@ -110,7 +110,7 @@ public class SpanFormattableTests
         Assert.Equal(expected.Length, charsWritten);
         Assert.Equal(expected, new string(destination));
 
-        // A shorter destination is not, and nothing is written.
+        // A shorter destination is not sufficient. TryFormat writes nothing into it.
         var shortDestination = new char[expected.Length - 1];
         Assert.False(value.TryFormat(shortDestination, out charsWritten, default, null));
         Assert.Equal(0, charsWritten);

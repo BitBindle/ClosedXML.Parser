@@ -29,6 +29,25 @@ public class NameUtilsTests
     }
 
     [Theory]
+    [Trait("Issue", "22")]
+    [InlineData("Sheet")]
+    [InlineData("O'Brien")]
+    [InlineData("'a''b'")]
+    [InlineData("Q3")]
+    [InlineData("My Sheet")]
+    [InlineData("")]
+    public void Format_sheet_reference_gives_same_text_as_string_builder(string sheet)
+    {
+        // The span method and the StringBuilder method must write the same sheet prefix.
+        var expected = new StringBuilder().AppendSheetReference(sheet).ToString();
+        Span<char> buffer = stackalloc char[NameUtils.GetMaxSheetReferenceLength(sheet)];
+
+        var length = NameUtils.FormatSheetReference(buffer, sheet);
+
+        Assert.Equal(expected, buffer[..length].ToString());
+    }
+
+    [Theory]
     [InlineData("A", false)] // First char - Letter-like
     [InlineData("Z", false)]
     [InlineData("㝳", false)]

@@ -14,9 +14,10 @@ internal static class StringBuilderExtensions
     /// </summary>
     public static StringBuilder AppendSheetReference(this StringBuilder sb, ReadOnlySpan<char> sheetName)
     {
-        var maxLength = NameUtils.GetMaxSheetReferenceLength(sheetName);
-        Span<char> buffer = maxLength <= CopyVisitor.StackBufferLength ? stackalloc char[CopyVisitor.StackBufferLength] : new char[maxLength];
-        return sb.Append(buffer[..NameUtils.FormatSheetReference(buffer, sheetName)]);
+        if (sheetName.IsEmpty)
+            return sb.Append("#REF!");
+
+        return NameUtils.EscapeName(sb, sheetName).AppendReferenceSeparator();
     }
 
     public static StringBuilder AppendExternalSheetReference(this StringBuilder sb, int workbookIndex, ReadOnlySpan<char> sheetName)
