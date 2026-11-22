@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [ develop ]
+  pull_request:
+    branches: [ develop ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore dependencies
+        run: dotnet restore ClosedXML.Parser.slnx
+
+      - name: Build
+        run: dotnet build ClosedXML.Parser.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: >
+          dotnet test src/ClosedXML.Parser.Tests/ClosedXML.Parser.Tests.csproj
+          --configuration Release --no-build
+          --collect "Code Coverage;Format=cobertura"
+          --logger "trx;LogFileName=test-results.trx" --results-directory test-results
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results
+          if-no-files-found: ignore
+
+      - name: Make coverage report
+        # The report shows the line coverage of the library assembly. It has no threshold.
+        if: ${{ !cancelled() && hashFiles('test-results/**/*.cobertura.xml') != '' }}
+        run: |
+          dotnet tool install --global dotnet-reportgenerator-globaltool --version 5.6.1
+          reportgenerator -reports:"test-results/**/*.cobertura.xml" -targetdir:coverage-report -reporttypes:"MarkdownSummaryGithub;Cobertura;HtmlSummary" -assemblyfilters:"+ClosedXML.Parser"
+          cat coverage-report/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage report
+        if: ${{ !cancelled() && hashFiles('coverage-report/**') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage-report

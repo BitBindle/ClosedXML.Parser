@@ -1,95 +1,106 @@
-# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
-# Created from https://www.meziantou.net/publishing-a-nuget-package-following-best-practices-using-github.htm
-# The setup job iInstalls the .NET SDK indicated in the global.json file
+name: Release
 
-name: publish
-
+# A person starts this workflow. It builds and tests the commit, publishes the NuGet package to GitHub Packages
+# and creates a GitHub release with generated release notes.
+#
+# VersionMajorMinor in Directory.Build.props sets the major and minor version. The patch version is the highest
+# patch of the existing tags of that major.minor plus one (.github/scripts/next-version.sh).
 on:
-  workflow_dispatch: # Allow running the workflow manually from the GitHub UI
-  release:
-    types:
-      - published    # Run the workflow when a new GitHub release is published
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Build, test and pack, but do not create a tag, publish the package or create a release
+        type: boolean
+        default: false
 
-env:
-  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
-  DOTNET_NOLOGO: true
-  NuGetDirectory: ${{ github.workspace }}/nuget
+# Two releases at the same time can get the same version.
+concurrency:
+  group: release
+  cancel-in-progress: false
 
-defaults:
-  run:
-    shell: pwsh
+permissions:
+  contents: read
 
 jobs:
-  run_test:
+  release:
+    name: Release
+    # A release comes only from develop.
+    if: github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # Create the tag and the release
+      packages: write   # Push the package to GitHub Packages
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          # next-version.sh reads all tags to find the next patch version.
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Determine version
+        run: |
+          version="$(.github/scripts/next-version.sh)"
+          echo "version=$version" >> "$GITHUB_ENV"
+          echo "Releasing $version" >> "$GITHUB_STEP_SUMMARY"
+          echo "Releasing $version"
 
       - name: Restore dependencies
         run: dotnet restore ClosedXML.Parser.slnx
 
-      - name: Build ClosedXML.Parser
-        run: dotnet build ClosedXML.Parser.slnx --configuration Release --no-restore
+      - name: Build
+        # VersionPrefix is major.minor.patch. Directory.Build.props gives the suffix. The RepositoryUrl
+        # parameter links the package to this repository. Directory.Build.props has the upstream URL.
+        run: >
+          dotnet build ClosedXML.Parser.slnx --configuration Release --no-restore
+          -p:VersionPrefix="${version%%-*}"
+          -p:RepositoryUrl="${{ github.server_url }}/${{ github.repository }}"
 
-      - name: Run tests
-        run: dotnet test ClosedXML.Parser.slnx --configuration Release --no-restore --no-build 
+      - name: Test
+        run: >
+          dotnet test src/ClosedXML.Parser.Tests/ClosedXML.Parser.Tests.csproj
+          --configuration Release --no-build
 
-  create_nuget:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+      - name: Pack
+        run: >
+          dotnet pack src/ClosedXML.Parser/ClosedXML.Parser.csproj
+          --configuration Release --no-build --output artifacts
+          -p:VersionPrefix="${version%%-*}"
+          -p:RepositoryUrl="${{ github.server_url }}/${{ github.repository }}"
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-
-      - name: Restore dependencies
-        run: dotnet restore ./src/ClosedXML.Parser/ClosedXML.Parser.csproj
-
-      - name: Build ClosedXML.Parser
-        run: dotnet build ./src/ClosedXML.Parser/ClosedXML.Parser.csproj --configuration Release --no-restore
-
-      # Create the NuGet package in the folder from the environment variable NuGetDirectory
-      - run: dotnet pack ./src/ClosedXML.Parser/ClosedXML.Parser.csproj --configuration Release --no-restore --no-build --output ${{ env.NuGetDirectory }}
-    
-      # Publish the NuGet package as an artifact, so they can be used in the following jobs
-      - uses: actions/upload-artifact@v4
-        with:
-          name: nuget
-          if-no-files-found: error
-          retention-days: 7
-          path: |
-            ${{ env.NuGetDirectory }}/*.nupkg
-            ${{ env.NuGetDirectory }}/*.snupkg
-
-  deploy:
-    # Publish only when creating a GitHub Release
-    if: github.event_name == 'release'
-    runs-on: ubuntu-latest
-    needs: [ run_test, create_nuget ]
-    steps:
-      # Download the NuGet package created in the previous job
-      - uses: actions/download-artifact@v4
-        with:
-          name: nuget
-          path: ${{ env.NuGetDirectory }}
-
-      - name: Verify NuGet package exists
-        run: ls -l ${{ env.NuGetDirectory }}
-        shell: bash
-
-      # Install the .NET SDK indicated in the global.json file
-      - name: Setup .NET Core
-        uses: actions/setup-dotnet@v4
-
-      # Publish all NuGet packages to NuGet.org
-      # Use --skip-duplicate to prevent errors if a package with the same version already exists.
-      # If you retry a failed workflow, already published packages will be skipped without error.
-      - name: Publish NuGet package
+      - name: Check package
         run: |
-          for file in ${{ env.NuGetDirectory }}/*.{nupkg,snupkg}; do
-            dotnet nuget push "$file" --api-key "${{ secrets.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
-          done
-        shell: bash
+          ls -l artifacts
+          [[ -f "artifacts/ClosedXML.Parser.$version.nupkg" ]] || { echo "::error::Package ClosedXML.Parser.$version.nupkg is missing"; exit 1; }
+
+      - name: Create tag
+        # The tag reserves the version. If a later step fails, the next release does not use the version again.
+        if: ${{ !inputs.dry_run }}
+        run: |
+          git tag "$version" "$GITHUB_SHA"
+          git push origin "refs/tags/$version"
+
+      - name: Push to GitHub Packages
+        # GitHub Packages does not accept symbol packages (.snupkg), so the package contains the pdb.
+        # GitHub Packages refuses a version that it already has, so a version is never published two times.
+        if: ${{ !inputs.dry_run }}
+        run: >
+          dotnet nuget push "artifacts/*.nupkg"
+          --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
+          --api-key "${{ secrets.GITHUB_TOKEN }}"
+          --no-symbols
+
+      - name: Create GitHub release
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prerelease=()
+          [[ "$version" == *-* ]] && prerelease=(--prerelease)
+          gh release create "$version" artifacts/*.nupkg \
+            --verify-tag --title "$version" --generate-notes "${prerelease[@]}"
