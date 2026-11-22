@@ -1,4 +1,15 @@
 <Project>
+  <!-- These properties set the version. The release workflow (.github/workflows/release.yml) finds the next
+       free patch version for the major.minor and gives it as VersionPrefix. A local build is major.minor.0.
+       Add VersionSuffix, for example "preview", to release a prerelease version. -->
+  <PropertyGroup>
+    <VersionMajorMinor>2.0</VersionMajorMinor>
+    <VersionPrefix Condition="'$(VersionPrefix)' == ''">$(VersionMajorMinor).0</VersionPrefix>
+    <VersionSuffix></VersionSuffix>
+    <Version Condition="'$(VersionSuffix)' != ''">$(VersionPrefix)-$(VersionSuffix)</Version>
+    <Version Condition="'$(VersionSuffix)' == ''">$(VersionPrefix)</Version>
+  </PropertyGroup>
+
   <!-- These properties apply to each project in this repository. -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>

@@ -100,9 +100,7 @@ Generate a DFA through Rolex
 # TODO
 
 * Lexer generation during build
-* Proper CI pipeline.
-  * Azure Function
-  * Web 
+* Deployment of the Azure function and the web page from CI.
 * Fuzzer
 * PR to Rolex to fix unicode bug.
 
