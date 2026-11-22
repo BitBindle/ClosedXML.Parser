@@ -18,8 +18,8 @@
 
     <Authors>Jan Havlíček</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/ClosedXML/ClosedXML.Parser</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/ClosedXML/ClosedXML.Parser</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/BitBindle/closedxml.parser</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/BitBindle/closedxml.parser</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
 
     <!-- InternalsVisibleTo in ClosedXML.Parser needs the public key of the test assembly.
