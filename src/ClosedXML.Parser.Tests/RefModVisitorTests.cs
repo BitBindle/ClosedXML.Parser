@@ -41,11 +41,19 @@ public class RefModVisitorTests
     [Theory]
     [InlineData("'Old sheet'!#REF!")]
     [InlineData("'It''s'!#REF!")]
-    [InlineData("[1]Old!#REF!")]
-    [InlineData("'[1]Old sheet'!#REF!")]
     public void ErrorNode_with_sheet_keeps_formula_when_sheet_does_not_change(string formula)
     {
         // The sheet name in the formula is in quotes, but the visitor gets the unescaped name.
+        var factory = new FormulaVisitor { SheetMap = { { "Old", "New" } } };
+        AssertChangesA1(formula, factory, formula);
+    }
+
+    [Theory]
+    [InlineData("[1]Old!#REF!")]
+    [InlineData("'[1]Old'!#REF!")]
+    public void ErrorNode_keeps_sheet_of_other_workbook(string formula)
+    {
+        // The map renames the local sheet Old, not the sheet Old of another workbook.
         var factory = new FormulaVisitor { SheetMap = { { "Old", "New" } } };
         AssertChangesA1(formula, factory, formula);
     }

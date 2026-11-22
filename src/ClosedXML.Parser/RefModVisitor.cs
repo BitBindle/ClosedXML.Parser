@@ -80,7 +80,8 @@ public class RefModVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, M
         TokenParser.ParseSingleSheetPrefix(sheetPrefix, out var workbookIndex, out var sheet);
         if (workbookIndex is not null)
         {
-            // A sheet of another workbook does not change, the same as in other external references.
+            // A sheet of another workbook does not change, the same as in ExternalSheetReference,
+            // ExternalFunction and ExternalSheetName.
             return TransformedSymbol.CopyOriginal(ctx.Formula, range);
         }
 
@@ -303,7 +304,7 @@ public class RefModVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, M
     }
 
     /// <summary>
-    /// Modify reference to a cell.
+    /// Modify the name of a table, for example to rename it.
     /// </summary>
     /// <param name="ctx">The origin of formula.</param>
     /// <param name="table">Original name of a table. The span is valid only during the call.</param>
