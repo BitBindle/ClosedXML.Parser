@@ -8,8 +8,13 @@ namespace ClosedXML.Parser;
 /// an area in a sheet. This is the DTO from parser to engine. Two corners make an area
 /// for A1 notation, but not for R1C1 (has several edge cases).
 /// </summary>
-public readonly record struct ReferenceArea
+public readonly record struct ReferenceArea : ISpanFormattable
 {
+    /// <summary>
+    /// The maximum length of a display string, two <see cref="RowCol"/> and a colon.
+    /// </summary>
+    internal const int MaxDisplayLength = 2 * RowCol.MaxDisplayLength + 1;
+
     /// <summary>
     /// First reference. First in terms of position in formula, not position
     /// in sheet.
@@ -92,9 +97,8 @@ public readonly record struct ReferenceArea
     /// </summary>
     public string GetDisplayStringA1()
     {
-        var sb = new StringBuilder();
-        AppendA1(sb);
-        return sb.ToString();
+        Span<char> buffer = stackalloc char[MaxDisplayLength];
+        return new string(buffer[..FormatA1(buffer)]);
     }
 
     /// <summary>
@@ -104,7 +108,54 @@ public readonly record struct ReferenceArea
     /// </summary>
     public string GetDisplayStringR1C1()
     {
-        return AppendR1C1(new StringBuilder()).ToString();
+        Span<char> buffer = stackalloc char[MaxDisplayLength];
+        return new string(buffer[..FormatR1C1(buffer)]);
+    }
+
+    /// <summary>
+    /// Get the area in its own notation, <em>A1</em> or <em>R1C1</em> (see <see cref="Style"/>).
+    /// </summary>
+    public override string ToString()
+    {
+        Span<char> buffer = stackalloc char[MaxDisplayLength];
+        return new string(buffer[..Format(buffer)]);
+    }
+
+    /// <summary>
+    /// Get the area in its own notation, <em>A1</em> or <em>R1C1</em> (see <see cref="Style"/>).
+    /// </summary>
+    /// <param name="format">Must be <c>null</c> or empty. There are no other formats.</param>
+    /// <param name="formatProvider">Not used. A reference does not depend on a culture.</param>
+    /// <exception cref="FormatException">The <paramref name="format"/> is not empty.</exception>
+    public string ToString(string? format, IFormatProvider? formatProvider)
+    {
+        RowCol.CheckFormat(format);
+        return ToString();
+    }
+
+    /// <summary>
+    /// Write the area in its own notation, <em>A1</em> or <em>R1C1</em> (see <see cref="Style"/>),
+    /// into the <paramref name="destination"/>.
+    /// </summary>
+    /// <param name="destination">The span where to write the area.</param>
+    /// <param name="charsWritten">The number of written chars, or 0 if the destination is too short.</param>
+    /// <param name="format">Must be empty. There are no other formats.</param>
+    /// <param name="provider">Not used. A reference does not depend on a culture.</param>
+    /// <returns><c>true</c> if the area was written, <c>false</c> if the destination is too short.</returns>
+    /// <exception cref="FormatException">The <paramref name="format"/> is not empty.</exception>
+    public bool TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format = default, IFormatProvider? provider = null)
+    {
+        RowCol.CheckFormat(format);
+        Span<char> buffer = stackalloc char[MaxDisplayLength];
+        var length = Format(buffer);
+        if (!buffer[..length].TryCopyTo(destination))
+        {
+            charsWritten = 0;
+            return false;
+        }
+
+        charsWritten = length;
+        return true;
     }
 
     /// <summary>
@@ -142,39 +193,48 @@ public readonly record struct ReferenceArea
 
     internal StringBuilder Append(StringBuilder sb)
     {
-        return Style == A1 ? AppendA1(sb) : AppendR1C1(sb);
+        Span<char> buffer = stackalloc char[MaxDisplayLength];
+        return sb.Append(buffer[..Format(buffer)]);
     }
 
     /// <summary>
-    /// Get reference in A1 notation.
+    /// Write the area in its own notation into the <paramref name="buffer"/>.
+    /// </summary>
+    /// <param name="buffer">A buffer with at least <see cref="MaxDisplayLength"/> chars.</param>
+    /// <returns>The number of written chars.</returns>
+    internal int Format(Span<char> buffer)
+    {
+        return Style == A1 ? FormatA1(buffer) : FormatR1C1(buffer);
+    }
+
+    /// <summary>
+    /// Write the area in A1 notation into the <paramref name="buffer"/>.
     /// </summary>
     /// <remarks>Assumes reference is in A1.</remarks>
-    internal StringBuilder AppendA1(StringBuilder sb)
+    private int FormatA1(Span<char> buffer)
     {
         // In A1, column and row span must have both parts specified.
         if (First == Second && !IsColSpan && !IsRowSpan)
-            return First.AppendA1(sb);
+            return First.FormatA1(buffer);
 
-        First.AppendA1(sb);
-        sb.Append(':');
-        Second.AppendA1(sb);
-        return sb;
+        var length = First.FormatA1(buffer);
+        buffer[length++] = ':';
+        return length + Second.FormatA1(buffer[length..]);
     }
 
     /// <summary>
-    /// Get reference in R1C1 notation.
+    /// Write the area in R1C1 notation into the <paramref name="buffer"/>.
     /// </summary>
     /// <remarks>Assumes reference is in R1C1.</remarks>
-    internal StringBuilder AppendR1C1(StringBuilder sb)
+    private int FormatR1C1(Span<char> buffer)
     {
-        First.AppendR1C1(sb);
-
+        var length = First.FormatR1C1(buffer);
         if (First != Second)
         {
-            sb.Append(':');
-            Second.AppendR1C1(sb);
+            buffer[length++] = ':';
+            length += Second.FormatR1C1(buffer[length..]);
         }
 
-        return sb;
+        return length;
     }
 }

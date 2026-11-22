@@ -19,6 +19,11 @@ public class CopyVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, Mod
     private const int BOOK_PREFIX_LEN = 3;
     private const int MAX_R1_C1_LEN = 20;
 
+    /// <summary>
+    /// The length of a stack buffer for a node text. A longer text uses a heap buffer.
+    /// </summary>
+    internal const int StackBufferLength = 256;
+
     /// <inheritdoc />
     public virtual TransformedSymbol LogicalValue(ModContext ctx, SymbolRange range, bool value)
     {
@@ -83,31 +88,27 @@ public class CopyVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, Mod
     /// <inheritdoc />
     public virtual TransformedSymbol Reference(ModContext ctx, SymbolRange range, ReferenceArea reference)
     {
-        var sb = new StringBuilder(MAX_R1_C1_LEN);
-        var nodeText = sb.AppendRef(reference).ToString();
-        return ToSymbol(ctx, range, nodeText);
+        Span<char> buffer = stackalloc char[ReferenceArea.MaxDisplayLength];
+        return ToSymbol(ctx, range, buffer[..reference.Format(buffer)]);
     }
 
     /// <inheritdoc />
     public virtual TransformedSymbol SheetReference(ModContext ctx, SymbolRange range, ReadOnlySpan<char> sheet, ReferenceArea reference)
     {
-        var sb = new StringBuilder(sheet.Length + QUOTE_RESERVE + SHEET_SEPARATOR_LEN + MAX_R1_C1_LEN);
-        var nodeText = sb
-            .AppendSheetReference(sheet)
-            .AppendRef(reference)
-            .ToString();
-        return ToSymbol(ctx, range, nodeText);
+        var maxLength = NameUtils.GetMaxSheetReferenceLength(sheet) + ReferenceArea.MaxDisplayLength;
+        Span<char> buffer = maxLength <= StackBufferLength ? stackalloc char[StackBufferLength] : new char[maxLength];
+        var length = NameUtils.FormatSheetReference(buffer, sheet);
+        length += reference.Format(buffer[length..]);
+        return ToSymbol(ctx, range, buffer[..length]);
     }
 
     /// <inheritdoc />
     public virtual TransformedSymbol BangReference(ModContext ctx, SymbolRange range, ReferenceArea reference)
     {
-        var sb = new StringBuilder(SHEET_SEPARATOR_LEN + MAX_R1_C1_LEN);
-        var nodeText = sb
-            .AppendReferenceSeparator()
-            .AppendRef(reference)
-            .ToString();
-        return ToSymbol(ctx, range, nodeText);
+        Span<char> buffer = stackalloc char[SHEET_SEPARATOR_LEN + ReferenceArea.MaxDisplayLength];
+        buffer[0] = '!';
+        var length = SHEET_SEPARATOR_LEN + reference.Format(buffer[SHEET_SEPARATOR_LEN..]);
+        return ToSymbol(ctx, range, buffer[..length]);
     }
 
     /// <inheritdoc />
@@ -218,10 +219,8 @@ public class CopyVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, Mod
     /// <inheritdoc />
     public virtual TransformedSymbol CellFunction(ModContext ctx, SymbolRange range, RowCol cell, IReadOnlyList<TransformedSymbol> arguments)
     {
-        var prefix = new StringBuilder(MAX_R1_C1_LEN)
-            .AppendRef(cell)
-            .ToString();
-        return BuildFunction(ctx, range, prefix.AsSpan(), arguments);
+        Span<char> prefix = stackalloc char[RowCol.MaxDisplayLength];
+        return BuildFunction(ctx, range, prefix[..cell.Format(prefix)], arguments);
     }
 
     /// <inheritdoc />
@@ -333,6 +332,16 @@ public class CopyVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, Mod
         return original.SequenceEqual(nodeText.AsSpan())
             ? TransformedSymbol.CopyOriginal(ctx.Formula, range)
             : TransformedSymbol.ToText(ctx.Formula, range, nodeText);
+    }
+
+    /// <inheritdoc cref="ToSymbol(ModContext, SymbolRange, string)"/>
+    /// <remarks>The method allocates a string only when the text is not the same as the original text.</remarks>
+    private static TransformedSymbol ToSymbol(ModContext ctx, SymbolRange range, ReadOnlySpan<char> nodeText)
+    {
+        var original = ctx.Formula.AsSpan(range.Start, range.Length);
+        return original.SequenceEqual(nodeText)
+            ? TransformedSymbol.CopyOriginal(ctx.Formula, range)
+            : TransformedSymbol.ToText(ctx.Formula, range, nodeText.ToString());
     }
 
     /// <summary>

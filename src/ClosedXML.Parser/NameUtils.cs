@@ -222,6 +222,56 @@ public static class NameUtils
         return true;
     }
 
+    /// <summary>
+    /// Get the maximum length of the text that <see cref="FormatSheetReference"/> writes for the
+    /// <paramref name="sheet"/>: the quotes, a doubled tick for each char and the separator.
+    /// </summary>
+    internal static int GetMaxSheetReferenceLength(ReadOnlySpan<char> sheet)
+    {
+        return sheet.IsEmpty ? DeletedSheetReference.Length : 2 * sheet.Length + 3;
+    }
+
+    /// <summary>
+    /// Write a sheet name and the reference separator, e.g. <c>'Jane''s'!</c>. An empty sheet
+    /// name is a deleted sheet, and it is written as <c>#REF!</c>.
+    /// </summary>
+    /// <param name="buffer">A buffer with at least <see cref="GetMaxSheetReferenceLength"/> chars.</param>
+    /// <param name="sheet">The unescaped sheet name.</param>
+    /// <returns>The number of written chars.</returns>
+    internal static int FormatSheetReference(Span<char> buffer, ReadOnlySpan<char> sheet)
+    {
+        if (sheet.IsEmpty)
+        {
+            DeletedSheetReference.CopyTo(buffer);
+            return DeletedSheetReference.Length;
+        }
+
+        var length = 0;
+        if (ShouldQuote(sheet))
+        {
+            buffer[length++] = '\'';
+            foreach (var c in sheet)
+            {
+                if (c == '\'')
+                    buffer[length++] = '\'';
+
+                buffer[length++] = c;
+            }
+
+            buffer[length++] = '\'';
+        }
+        else
+        {
+            sheet.CopyTo(buffer);
+            length = sheet.Length;
+        }
+
+        buffer[length++] = '!';
+        return length;
+    }
+
+    private const string DeletedSheetReference = "#REF!";
+
     internal static StringBuilder EscapeName(StringBuilder sb, ReadOnlySpan<char> sheet)
     {
         return ShouldQuote(sheet)

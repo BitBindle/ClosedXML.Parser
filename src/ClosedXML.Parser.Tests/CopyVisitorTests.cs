@@ -127,6 +127,24 @@ public class CopyVisitorTests
         AssertChangesA1("A1+A2", visitor, "B1+B2");
     }
 
+    [Fact]
+    [Trait("Issue", "22")]
+    public void Sheet_reference_with_long_sheet_name_is_written()
+    {
+        // A long sheet name does not fit in the stack buffer, so the visitor uses a heap buffer.
+        var sheet = "'" + new string('x', 150) + " y''s'";
+        AssertChangesA1(sheet + "!A1", new CopyVisitor(), sheet + "!A1");
+        AssertChangesA1(sheet + "!A1+1", new MoveA1Visitor(), sheet + "!D4+1");
+        AssertChangesA1(sheet + "!#REF!", new RefModVisitor(), sheet + "!#REF!");
+    }
+
+    [Fact]
+    [Trait("Issue", "22")]
+    public void Changed_bang_reference_and_cell_function_are_written()
+    {
+        AssertChangesA1("!A1+A1(1)", new MoveA1Visitor(), "!D4+A1(1)");
+    }
+
     private static long AllocatedBytesForChain(int referenceCount)
     {
         var formula = string.Join("+", Enumerable.Range(1, referenceCount).Select(i => "A" + i));
