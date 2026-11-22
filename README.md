@@ -8,19 +8,34 @@ This repository is a fork of [ClosedXML.Parser](https://github.com/ClosedXML/Clo
 
 The release workflow publishes the `ClosedXML.Parser` package to the GitHub Packages NuGet feed of BitBindle. The package targets `net10.0`.
 
-To use the package, add the feed to your `nuget.config`:
+GitHub Packages needs authentication, also for a public package. Use a token with the `read:packages` scope.
+
+The package ID is the same as the ID of the upstream package on nuget.org. The release workflow does not publish a version that nuget.org already has. Use package source mapping, so that NuGet gets `ClosedXML.Parser` only from the fork feed.
+
+Example `nuget.config`. It reads the user name and the token from the `GITHUB_USER` and `GITHUB_TOKEN` environment variables:
 
 ```xml
 <configuration>
   <packageSources>
+    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
     <add key="github-bitbindle" value="https://nuget.pkg.github.com/BitBindle/index.json" />
   </packageSources>
+  <packageSourceCredentials>
+    <github-bitbindle>
+      <add key="Username" value="%GITHUB_USER%" />
+      <add key="ClearTextPassword" value="%GITHUB_TOKEN%" />
+    </github-bitbindle>
+  </packageSourceCredentials>
+  <packageSourceMapping>
+    <packageSource key="github-bitbindle">
+      <package pattern="ClosedXML.Parser" />
+    </packageSource>
+    <packageSource key="nuget.org">
+      <package pattern="*" />
+    </packageSource>
+  </packageSourceMapping>
 </configuration>
 ```
-
-GitHub Packages needs authentication, also for a public package. Use a token with the `read:packages` scope.
-
-The package ID is the same as the ID of the upstream package on nuget.org. The release workflow does not publish a version that nuget.org already has.
 
 ## How to use
 
@@ -31,7 +46,7 @@ The package ID is the same as the ID of the upstream package on nuget.org. The r
 
 The library also has these helpers:
 
-* `FormulaConverter` changes a formula from A1 to R1C1 and from R1C1 to A1.
+* `FormulaConverter` changes a formula from A1 to R1C1 and from R1C1 to A1. It also changes the references in a formula.
 * `ReferenceParser` parses a reference, for example `Sheet1!A1:B2`.
 * `NameUtils` finds when a sheet name needs quotes in a formula.
 
@@ -85,8 +100,8 @@ The base branch is `develop`. The CI workflow builds and tests each pull request
 
 ### Testing strategy
 
-* Some tokens have data for a node, for example `A1_CELL` `C5` gives row 5 and column 3. Each of these tokens has a test class `{TokenPascalName}TokenTests.cs` in the `Lexers` folder.
-* Each parser rule has a test class in the `Rules` folder. The test class has the combinations of the rule, and it compares the result with the AST nodes.
+* Some tokens have data for a node, for example `A1_CELL` `C5` gives row 5 and column 3. The `Lexers` folder has test classes for most of these tokens, for example `A1CellTokenTests.cs`.
+* The `Rules` folder has test classes for the parser rules, for example `CellReferenceRuleTests.cs`. Each test class has combinations of the rule, and it compares the result with the AST nodes.
 * `DataSetTests.cs` has the data set tests. Each test parses each formula in `data/<set>/formulas.csv`. The parse must fail for the formulas in the `known-fails.csv` and `invalid-external-cell-reference.csv` files of the set, if the set has them. The parse must not fail for the other formulas. The tests do not check the AST. The CSV files have one column.
 * `AntlrCompatibilityTests.cs` makes sure that the Rolex lexer gives the same tokens as the ANTLR lexer.
 
