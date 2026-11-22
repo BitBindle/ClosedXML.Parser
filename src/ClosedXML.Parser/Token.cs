@@ -14,7 +14,7 @@ internal readonly struct Token
     private static readonly IReadOnlyDictionary<int, string> SymbolNames = typeof(Token)
         .GetFields(BindingFlags.Public | BindingFlags.Static)
         .Where(f => f.FieldType == typeof(int) && f.IsLiteral)
-        .ToDictionary(x => (int)x.GetValue(null), x => x.Name);
+        .ToDictionary(x => (int)x.GetValue(null)!, x => x.Name);
 
     /// <summary>
     /// An error symbol id.

@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/.github/">
+    <File Path=".github/workflows/dotnet.yml" />
+    <File Path=".github/workflows/release.yml" />
+  </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path="Directory.Build.props" />
+    <File Path="global.json" />
+  </Folder>
+  <Project Path="src/ClosedXML.ANTLR/ClosedXML.ANTLR.csproj" />
+  <Project Path="src/ClosedXML.Parser.Ast/ClosedXML.Parser.Ast.csproj" />
+  <Project Path="src/ClosedXML.Parser.Function/ClosedXML.Parser.Function.csproj" />
+  <Project Path="src/ClosedXML.Parser.Tests/ClosedXML.Parser.Tests.csproj" />
+  <Project Path="src/ClosedXML.Parser/ClosedXML.Parser.csproj" />
+</Solution>

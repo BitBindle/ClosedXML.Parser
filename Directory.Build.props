@@ -1,0 +1,23 @@
+<Project>
+  <!-- These properties apply to each project in the src folder. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+
+    <Authors>Jan Havlíček</Authors>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/ClosedXML/ClosedXML.Parser</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/ClosedXML/ClosedXML.Parser</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+
+    <!-- The tests use internal types, so all assemblies have the same strong name key. -->
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)src/ClosedXML.Parser.snk</AssemblyOriginatorKeyFile>
+  </PropertyGroup>
+
+  <!-- A deterministic build gives the same binary on each machine. -->
+  <PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+</Project>

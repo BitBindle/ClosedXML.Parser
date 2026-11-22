@@ -1,5 +1,6 @@
-﻿using System;
-using Newtonsoft.Json;
+using System;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace ClosedXML.Parser.Function;
 
@@ -12,27 +13,23 @@ internal class AstNodeConverter : JsonConverter<AstNode>
         _style = style;
     }
 
-    public override AstNode ReadJson(JsonReader reader, Type objectType, AstNode existingValue, bool hasExistingValue, JsonSerializer serializer)
+    public override AstNode Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         throw new NotSupportedException("Deserialization of AST is not supported.");
     }
 
-    public override void WriteJson(JsonWriter writer, AstNode value, JsonSerializer serializer)
+    public override void Write(Utf8JsonWriter writer, AstNode value, JsonSerializerOptions options)
     {
         WriteNode(writer, value);
     }
 
-    private void WriteNode(JsonWriter writer, AstNode value)
+    private void WriteNode(Utf8JsonWriter writer, AstNode value)
     {
         writer.WriteStartObject();
-        writer.WritePropertyName("type");
-        writer.WriteValue(value.GetTypeString());
+        writer.WriteString("type", value.GetTypeString());
+        writer.WriteString("content", value.GetDisplayString(_style));
 
-        writer.WritePropertyName("content");
-        writer.WriteValue(value.GetDisplayString(_style));
-
-        writer.WritePropertyName("children");
-        writer.WriteStartArray();
+        writer.WriteStartArray("children");
         foreach (var child in value.Children)
             WriteNode(writer, child);
 
