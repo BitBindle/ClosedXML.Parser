@@ -10,8 +10,8 @@ internal static class StructuredReferenceAreaExtensions
             StructuredReferenceArea.Data => "[#Data]",
             StructuredReferenceArea.Headers => "[#Headers]",
             StructuredReferenceArea.Totals => "[#Totals]",
-            StructuredReferenceArea.Data | StructuredReferenceArea.Headers => "[#Headers], [#Data]",
-            StructuredReferenceArea.Data | StructuredReferenceArea.Totals => "[#Data], [#Totals]",
+            StructuredReferenceArea.Data | StructuredReferenceArea.Headers => "[#Headers],[#Data]",
+            StructuredReferenceArea.Data | StructuredReferenceArea.Totals => "[#Data],[#Totals]",
             StructuredReferenceArea.All => "[#All]",
             StructuredReferenceArea.ThisRow => "[#This Row]",
             _ => throw new NotSupportedException($"Unexpected area {area}.")

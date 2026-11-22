@@ -51,6 +51,23 @@ public class CopyVisitorTests
     }
 
     [Theory]
+    [Trait("Issue", "32")]
+    [InlineData("Table1[Col']]")]
+    [InlineData("Table1[Col'[]")]
+    [InlineData("Table1[It''s]")]
+    [InlineData("Table1['#Total]")]
+    [InlineData("Table1[[#Data],[a'#b]]")]
+    [InlineData("Table1[[A']]:[B'[]]")]
+    [InlineData("Table1[[#Headers],[#Data],[A']]:[B'#]]")]
+    [InlineData("[Col']]")]
+    [InlineData("[4]!Table1[Col']]")]
+    public void Structure_reference_column_keeps_escape_ticks(string formula)
+    {
+        // The parser gives the visitor the column name without the escape ticks.
+        AssertChangesA1(formula, new RefModVisitor(), formula);
+    }
+
+    [Theory]
     [Trait("Issue", "21")]
     [InlineData("[4]!SomeTable[Column]")]
     [InlineData("[4]!SomeTable[[#Data],[Col]]")]

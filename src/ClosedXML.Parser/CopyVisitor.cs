@@ -482,17 +482,20 @@ public class CopyVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, Mod
             if (area == StructuredReferenceArea.None)
             {
                 // One column, no keyword
-                return new StringBuilder(firstColumn.Length + 2)
-                    .Append('[').Append(firstColumn).Append(']')
+                var columnSb = new StringBuilder(firstColumn.Length + 2).Append('[');
+                return NameUtils.AppendEscapedColumnName(columnSb, firstColumn)
+                    .Append(']')
                     .ToString();
             }
 
             // One column, keyword
             var keywordList = KeywordList(area);
-            return new StringBuilder(keywordList.Length + firstColumn.Length + 5)
+            var keywordSb = new StringBuilder(keywordList.Length + firstColumn.Length + 5)
                 .Append('[')
                 .Append(keywordList).Append(',')
-                .Append('[').Append(firstColumn).Append(']')
+                .Append('[');
+            return NameUtils.AppendEscapedColumnName(keywordSb, firstColumn)
+                .Append(']')
                 .Append(']')
                 .ToString();
         }
@@ -505,10 +508,10 @@ public class CopyVisitor : IAstFactory<TransformedSymbol, TransformedSymbol, Mod
             if (keywordList.Length > 0)
                 sb.Append(keywordList).Append(',');
 
-            return sb
-                .Append('[').Append(firstColumn).Append(']')
-                .Append(':')
-                .Append('[').Append(lastColumn).Append(']')
+            sb.Append('[');
+            NameUtils.AppendEscapedColumnName(sb, firstColumn).Append(']').Append(':').Append('[');
+            return NameUtils.AppendEscapedColumnName(sb, lastColumn)
+                .Append(']')
                 .Append(']')
                 .ToString();
         }

@@ -12,25 +12,8 @@ public record ExternalStructureReferenceNode(
     public override string GetDisplayString(ReferenceStyle style)
     {
         var sb = new StringBuilder();
-        sb.AppendFormat($"[{WorkbookIndex}]");
+        sb.Append('[').Append(WorkbookIndex).Append("]!");
         sb.Append(Table);
-        if (Area == StructuredReferenceArea.None && FirstColumn is null && LastColumn is null)
-            return sb.Append("[]").ToString();
-
-        sb.Append('[');
-
-        var list = new List<string>(3);
-        if (Area != StructuredReferenceArea.None)
-            list.Add(Area.GetDisplayString());
-
-        if (FirstColumn is not null)
-            list.Add($"[{FirstColumn}]");
-
-        if (LastColumn is not null)
-            list.Add($"[{LastColumn}]");
-
-        sb.Append(string.Join(",", list));
-        sb.Append(']');
-        return sb.ToString();
+        return StructuredReferenceText.AppendIntraTableReference(sb, Area, FirstColumn, LastColumn).ToString();
     }
 };
