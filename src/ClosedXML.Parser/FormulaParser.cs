@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using ClosedXML.Parser.Rolex;
-using JetBrains.Annotations;
 
 namespace ClosedXML.Parser;
 
@@ -16,7 +15,6 @@ namespace ClosedXML.Parser;
 /// <typeparam name="TScalarValue">Type of a scalar value used across expressions.</typeparam>
 /// <typeparam name="TNode">Type of a node used in the AST.</typeparam>
 /// <typeparam name="TContext">A context of the parsing. It's passed to every factory method and can contain global info that doesn't belong individual nodes.</typeparam>
-[PublicAPI]
 public class FormulaParser<TScalarValue, TNode, TContext>
 {
     private const string REF_ERROR = "#REF!";

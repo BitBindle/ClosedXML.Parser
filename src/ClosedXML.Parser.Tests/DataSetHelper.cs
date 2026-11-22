@@ -1,7 +1,6 @@
 ﻿using CsvHelper.Configuration.Attributes;
 using CsvHelper.Configuration;
 using CsvHelper;
-using JetBrains.Annotations;
 using System.Globalization;
 
 namespace ClosedXML.Parser.Tests;
@@ -18,6 +17,5 @@ internal static class DataSets
             yield return formula.Text;
     }
 
-    [UsedImplicitly]
     private record Formula([Index(0)] string Text);
 }
