@@ -2,7 +2,7 @@
 
 ClosedXML.Parser is a .NET library that parses Excel formulas into an abstract syntax tree (AST). ClosedXML uses it to evaluate formulas and to change references in formulas.
 
-This repository is a fork of [ClosedXML.Parser](https://github.com/ClosedXML/ClosedXML.Parser) by Jan Havlíček. The fork has its own releases, issues and changes. The license is MIT (see [LICENSE.txt](LICENSE.txt)).
+This repository is a fork of [ClosedXML.Parser](https://github.com/ClosedXML/ClosedXML.Parser) by Jan Havlíček. The fork has its own releases, issues and changes. The license is MIT (see [LICENSE.txt](https://github.com/BitBindle/closedxml.parser/blob/develop/LICENSE.txt)).
 
 ## Package
 
@@ -46,13 +46,12 @@ The `ClosedXML.Parser.Ast` project has a simple AST and a factory. The tests use
 
 ## Design
 
-The official source of the grammar is [MS-XLSX](https://learn.microsoft.com/en-us/openspecs/office_standards/ms-xlsx/2c5dee00-eff2-4b22-92b6-0738acd4475e), chapter 2.2.2 Formulas. A copy is in [MS-XLSX-parser-grammar.abnf](MS-XLSX-parser-grammar.abnf). A parser generator can not use this grammar directly: it has ambiguities, and its rules do not show the operator precedence.
+The official source of the grammar is [MS-XLSX](https://learn.microsoft.com/en-us/openspecs/office_standards/ms-xlsx/2c5dee00-eff2-4b22-92b6-0738acd4475e), chapter 2.2.2 Formulas. A copy is in [MS-XLSX-parser-grammar.abnf](https://github.com/BitBindle/closedxml.parser/blob/develop/MS-XLSX-parser-grammar.abnf). A parser generator can not use this grammar directly: it has ambiguities, and its rules do not show the operator precedence.
 
 The ANTLR4 grammar in `src/ClosedXML.ANTLR` is the source of truth for the lexer and the parser:
 
 * __Lexer__: Rolex generates a DFA lexer from the ANTLR lexer grammar (see [Generate the lexer](#generate-the-lexer)). It is approximately two times faster than the ANTLR lexer.
 * __Parser__: `FormulaParser` is a recursive descent parser. It follows the rules of the ANTLR parser grammar, but it does not use ANTLR at runtime.
-* __Pratt parser__: `src/ClosedXML.Parser/Pratt` has an experimental Pratt parser. It does not parse all formulas yet, and the library does not use it.
 
 ### Performance
 
@@ -72,7 +71,7 @@ Thus:
 
 ## Development
 
-`AGENTS.md` gives the rules for each change, and the commands to build, test and check the code. The short form:
+[AGENTS.md](https://github.com/BitBindle/closedxml.parser/blob/develop/AGENTS.md) gives the rules for each change, and the commands to build, test and check the code. The short form:
 
 ```bash
 dotnet build ClosedXML.Parser.slnx --configuration Release
@@ -86,9 +85,9 @@ The base branch is `develop`. The CI workflow builds and tests each pull request
 
 ### Testing strategy
 
-* Each token with data for a node (for example, `A1_CELL` `C5` gives row 5 and column 3) has a test class in the `Lexers` folder with the name `{TokenPascalName}TokenTests.cs`.
+* Some tokens have data for a node, for example `A1_CELL` `C5` gives row 5 and column 3. Each of these tokens has a test class `{TokenPascalName}TokenTests.cs` in the `Lexers` folder.
 * Each parser rule has a test class in the `Rules` folder. The test class has the combinations of the rule, and it compares the result with the AST nodes.
-* `DataSetTests.cs` has the data set tests. Each test parses each formula in `data/<set>/formulas.csv`. The parse must fail for the formulas in the known-fails files of the set, and it must not fail for the other formulas. The tests do not check the AST. The CSV files have one column.
+* `DataSetTests.cs` has the data set tests. Each test parses each formula in `data/<set>/formulas.csv`. The parse must fail for the formulas in the `known-fails.csv` and `invalid-external-cell-reference.csv` files of the set, if the set has them. The parse must not fail for the other formulas. The tests do not check the AST. The CSV files have one column.
 * `AntlrCompatibilityTests.cs` makes sure that the Rolex lexer gives the same tokens as the ANTLR lexer.
 
 Use the [vscode-antlr4](https://github.com/mike-lischke/vscode-antlr4/blob/master/doc/grammar-debugging.md) extension to debug the ANTLR grammar.
@@ -100,8 +99,8 @@ Use the [vscode-antlr4](https://github.com/mike-lischke/vscode-antlr4/blob/maste
 Prepare the Rolex grammars:
 
 1. Run Antlr2Rolex on `src/ClosedXML.ANTLR/FormulaLexer.g4` with the A1 version. Write the result to `src/ClosedXML.Parser/Rolex/LexerA1.rl`.
-2. Add `/*` at the start of the *Local A1 References* section. This removes `A1_REFERENCE` and all its fragments.
-3. Remove `/*` at the start of the *Local R1C1 References* section. This section has different tokens for `A1_REFERENCE` and its fragments.
+2. Add `/*` at the start of the *Local A1 References* section. This removes `A1_CELL`, `A1_SPAN_REFERENCE` and their fragments.
+3. Remove `/*` at the start of the *Local R1C1 References* section. This section has different tokens for `A1_CELL`, `A1_SPAN_REFERENCE` and their fragments.
 4. Run Antlr2Rolex on `src/ClosedXML.ANTLR/FormulaLexer.g4` with the R1C1 version. Write the result to `src/ClosedXML.Parser/Rolex/LexerR1C1.rl`.
 
 Fix the Rolex generator: Rolex does not read the `\u1234` escape (a Unicode escape with four hex digits) correctly. Add `pc.Advance()` to `_ParseEscapePart` and `_ParseRangeEscapePart` in `FFA.cs`.
