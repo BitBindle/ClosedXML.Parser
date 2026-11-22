@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Buffers;
 using System.Diagnostics;
 using static ClosedXML.Parser.ReferenceAxisType;
 
@@ -6,6 +7,13 @@ namespace ClosedXML.Parser;
 
 internal static class TokenParser
 {
+    /// <summary>
+    /// The maximum length of a buffer on the stack. A sheet name or a column name in a token has
+    /// no length limit, and a large buffer on the stack can overflow it. Thus a longer name uses
+    /// an array from the pool.
+    /// </summary>
+    private const int MaxStackBufferLength = 256;
+
     /// <summary>
     /// Parse <see cref="Token.SINGLE_SHEET_PREFIX"/> token.
     /// </summary>
@@ -84,35 +92,61 @@ internal static class TokenParser
 
     private static string GetEscapedSheetName(ref ReadOnlySpan<char> input, char endChar)
     {
-        Span<char> buffer = stackalloc char[input.Length];
-        var bufferIdx = 0;
-        var inputIdx = 0;
-        do
+        char[]? rented = null;
+        var buffer = input.Length <= MaxStackBufferLength
+            ? stackalloc char[MaxStackBufferLength]
+            : rented = ArrayPool<char>.Shared.Rent(input.Length);
+        try
         {
-            if (input[inputIdx] == '\'')
-                inputIdx++;
+            var bufferIdx = 0;
+            var inputIdx = 0;
+            do
+            {
+                if (input[inputIdx] == '\'')
+                    inputIdx++;
 
-            buffer[bufferIdx++] = input[inputIdx++];
-        } while (input[inputIdx] != endChar);
+                buffer[bufferIdx++] = input[inputIdx++];
+            } while (input[inputIdx] != endChar);
 
-        input = input.Slice(inputIdx + 1);
-        return buffer.Slice(0, bufferIdx).ToString();
+            input = input.Slice(inputIdx + 1);
+            return buffer.Slice(0, bufferIdx).ToString();
+        }
+        finally
+        {
+            ReturnToPool(rented);
+        }
     }
 
     private static string GetEscapedSheetName(ReadOnlySpan<char> input)
     {
-        Span<char> buffer = stackalloc char[input.Length];
-        var bufferIdx = 0;
-        var inputIdx = 0;
-        do
+        char[]? rented = null;
+        var buffer = input.Length <= MaxStackBufferLength
+            ? stackalloc char[MaxStackBufferLength]
+            : rented = ArrayPool<char>.Shared.Rent(input.Length);
+        try
         {
-            if (input[inputIdx] == '\'')
-                inputIdx++;
+            var bufferIdx = 0;
+            var inputIdx = 0;
+            do
+            {
+                if (input[inputIdx] == '\'')
+                    inputIdx++;
 
-            buffer[bufferIdx++] = input[inputIdx++];
-        } while (input.Length > inputIdx);
+                buffer[bufferIdx++] = input[inputIdx++];
+            } while (input.Length > inputIdx);
 
-        return buffer.Slice(0, bufferIdx).ToString();
+            return buffer.Slice(0, bufferIdx).ToString();
+        }
+        finally
+        {
+            ReturnToPool(rented);
+        }
+    }
+
+    private static void ReturnToPool(char[]? rented)
+    {
+        if (rented is not null)
+            ArrayPool<char>.Shared.Return(rented);
     }
 
     internal static RowCol ExtractCellFunction(ReadOnlySpan<char> cellFunctionToken)
@@ -449,20 +483,30 @@ internal static class TokenParser
     /// <param name="columnName">Parsed name.</param>
     private static int GetStructuredName(ReadOnlySpan<char> input, int startIdx, out string columnName)
     {
-        Span<char> buffer = stackalloc char[input.Length];
-        var bufferIdx = 0;
-        var i = startIdx + (input[startIdx] == '[' ? 1 : 0);
-        var c = input[i];
-        for (; c is not ']' and not ':'; c = input[++i])
+        char[]? rented = null;
+        var buffer = input.Length <= MaxStackBufferLength
+            ? stackalloc char[MaxStackBufferLength]
+            : rented = ArrayPool<char>.Shared.Rent(input.Length);
+        try
         {
-            if (c == '\'')
-                c = input[++i];
+            var bufferIdx = 0;
+            var i = startIdx + (input[startIdx] == '[' ? 1 : 0);
+            var c = input[i];
+            for (; c is not ']' and not ':'; c = input[++i])
+            {
+                if (c == '\'')
+                    c = input[++i];
 
-            buffer[bufferIdx++] = c;
+                buffer[bufferIdx++] = c;
+            }
+
+            columnName = buffer.Slice(0, bufferIdx).ToString();
+            return i + (c == ']' ? 1 : 0); // char after last bracket
         }
-
-        columnName = buffer.Slice(0, bufferIdx).ToString();
-        return i + (c == ']' ? 1 : 0); // char after last bracket
+        finally
+        {
+            ReturnToPool(rented);
+        }
     }
 
     private static StructuredReferenceArea GetArea(ReadOnlySpan<char> input, int i)

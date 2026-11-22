@@ -1005,13 +1005,10 @@ public class FormulaParser<TScalarValue, TNode, TContext>
                 break;
 
             case Token.STRING_CONSTANT:
-                var token = GetCurrentToken();
-                Span<char> buffer = stackalloc char[token.Length];
+                var text = ConvertTextValue(GetCurrentToken());
                 Consume();
                 symbolRange = new SymbolRange(start, _tokenSource.StartIndex);
-                value = ConvertTextValue(token, out var slice, ref buffer)
-                    ? _factory.TextValue(_context, symbolRange, slice.ToString())
-                    : _factory.TextValue(_context, symbolRange, buffer.ToString());
+                value = _factory.TextValue(_context, symbolRange, text);
                 break;
 
             default:
@@ -1115,41 +1112,37 @@ public class FormulaParser<TScalarValue, TNode, TContext>
 
     private string ConvertText()
     {
-        var token = GetCurrentToken();
-        Span<char> buffer = stackalloc char[token.Length];
-        return ConvertTextValue(token, out var slice, ref buffer)
-            ? slice.ToString()
-            : buffer.ToString();
+        return ConvertTextValue(GetCurrentToken());
     }
 
-    private static bool ConvertTextValue(ReadOnlySpan<char> token, out ReadOnlySpan<char> copy, ref Span<char> buffer)
+    /// <summary>
+    /// Get the value of a <see cref="Token.STRING_CONSTANT"/> token. The token has a quote at each
+    /// end, and each quote in the value is doubled.
+    /// </summary>
+    /// <remarks>
+    /// The method uses no temporary buffer, because a text literal has no length limit and a
+    /// large buffer on the stack can overflow it.
+    /// </remarks>
+    private static string ConvertTextValue(ReadOnlySpan<char> token)
     {
         var text = token.Slice(1, token.Length - 2);
-        var indexOfDQuote = text.IndexOf('"');
-        var textMustBeUnescaped = indexOfDQuote >= 0;
-        if (!textMustBeUnescaped)
-        {
-            copy = text;
-            return true;
-        }
+        var quoteCount = text.Count('"');
+        if (quoteCount == 0)
+            return text.ToString();
 
-        Span<char> unescaped = buffer;
-        var tail = unescaped;
-        var quoteCount = 0;
-        do
+        return string.Create(text.Length - quoteCount / 2, text, static (unescaped, escaped) =>
         {
-            var quoteText = text.Slice(0, indexOfDQuote + 1);
-            quoteText.CopyTo(tail);
-            tail = tail.Slice(indexOfDQuote + 1);
-            text = text.Slice(indexOfDQuote + 2);
-            indexOfDQuote = text.IndexOf('"');
-            quoteCount++;
-        } while (indexOfDQuote >= 0);
+            int indexOfDQuote;
+            while ((indexOfDQuote = escaped.IndexOf('"')) >= 0)
+            {
+                // Copy the text with the first quote of the pair, then skip the second quote.
+                escaped.Slice(0, indexOfDQuote + 1).CopyTo(unescaped);
+                unescaped = unescaped.Slice(indexOfDQuote + 1);
+                escaped = escaped.Slice(indexOfDQuote + 2);
+            }
 
-        text.CopyTo(tail);
-        buffer = unescaped.Slice(0, token.Length - 2 - quoteCount);
-        copy = default;
-        return false;
+            escaped.CopyTo(unescaped);
+        });
     }
 
     private TNode LocalFunctionCall()
