@@ -64,6 +64,28 @@ public class ParseFormulaFunctionTests
         Assert.Throws<NotSupportedException>(() => JsonSerializer.Deserialize<AstNode>("{}", options));
     }
 
+    [Fact]
+    [Trait("Issue", "4")]
+    public void Long_chain_of_binary_operators_gives_ast_deeper_than_default_json_depth()
+    {
+        var formula = string.Join("+", Enumerable.Repeat("A1", 100));
+
+        var result = Run("?formula=" + Uri.EscapeDataString(formula));
+
+        Assert.Null(result.StatusCode);
+        using var json = JsonDocument.Parse(ToJson(result), new JsonDocumentOptions { MaxDepth = 256 });
+        Assert.Equal(99, CountNodes(json.RootElement.GetProperty("ast"), "+"));
+    }
+
+    private static int CountNodes(JsonElement node, string content)
+    {
+        var count = node.GetProperty("content").GetString() == content ? 1 : 0;
+        foreach (var child in node.GetProperty("children").EnumerateArray())
+            count += CountNodes(child, content);
+
+        return count;
+    }
+
     private static JsonResult Run(string queryString)
     {
         var context = new DefaultHttpContext();

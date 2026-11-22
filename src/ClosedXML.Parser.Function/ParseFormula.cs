@@ -1,3 +1,4 @@
+using System;
 using System.Text.Json;
 using System.Threading;
 using Microsoft.AspNetCore.Http;
@@ -27,6 +28,10 @@ namespace ClosedXML.Parser.Function
                 var nodes = refStyle == ReferenceStyle.A1
                     ? FormulaParser<ScalarValue, AstNode, Ctx>.CellFormulaA1(formulaText, new Ctx(), new F())
                     : FormulaParser<ScalarValue, AstNode, Ctx>.CellFormulaR1C1(formulaText, new Ctx(), new F());
+
+                // The default maximum JSON depth is 64. A chain of binary operators makes a deep AST, and each AST
+                // level uses two JSON levels: the node object and its children array. The root object uses one level.
+                serializerOptions.MaxDepth = 2 * GetDepth(nodes) + 1;
                 return new JsonResult(new
                 {
                     formula = formulaText,
@@ -46,6 +51,15 @@ namespace ClosedXML.Parser.Function
                     StatusCode = StatusCodes.Status422UnprocessableEntity
                 };
             }
+        }
+
+        private static int GetDepth(AstNode node)
+        {
+            var childDepth = 0;
+            foreach (var child in node.Children)
+                childDepth = Math.Max(childDepth, GetDepth(child));
+
+            return childDepth + 1;
         }
     }
 }
