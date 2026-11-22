@@ -57,15 +57,6 @@ internal static class StringBuilderExtensions
         return reference is null ? sb.Append("#REF!") : reference.Value.Append(sb);
     }
 
-    public static StringBuilder AppendRef(this StringBuilder sb, RowCol? rowCol)
-    {
-        if (rowCol is null)
-            return sb.Append("#REF!");
-
-        rowCol.Value.Append(sb);
-        return sb;
-    }
-
     /// <summary>
     /// Get the index of the opening brace of a function. The brace is the last <c>(</c> before
     /// <paramref name="nodeStart"/>, the start of the first argument (or the end of the function

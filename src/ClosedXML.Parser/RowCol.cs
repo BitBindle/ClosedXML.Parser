@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Text;
+using System.Globalization;
 using static ClosedXML.Parser.ReferenceAxisType;
 
 namespace ClosedXML.Parser;
@@ -29,8 +29,13 @@ namespace ClosedXML.Parser;
 /// a valid standalone reference, but there is no such possibility for A1).
 /// </para>
 /// </summary>
-public readonly struct RowCol : IEquatable<RowCol>
+public readonly struct RowCol : IEquatable<RowCol>, ISpanFormattable
 {
+    /// <summary>
+    /// The maximum length of a display string, e.g. <c>R[-2147483648]C[-2147483648]</c>.
+    /// </summary>
+    internal const int MaxDisplayLength = 28;
+
     internal const int MinRow = 1;
     internal const int MaxRow = 1048576;
     internal const int MinCol = 1;
@@ -154,12 +159,8 @@ public readonly struct RowCol : IEquatable<RowCol>
     /// <exception cref="InvalidOperationException">When <c>RowCol</c> doesn't use <em>A1</em> semantic.</exception>
     public string GetDisplayStringA1()
     {
-        if (!IsA1)
-            throw new InvalidOperationException("RowCol doesn't use A1 semantic.");
-
-        var sb = new StringBuilder();
-        AppendA1(sb);
-        return sb.ToString();
+        Span<char> buffer = stackalloc char[MaxDisplayLength];
+        return new string(buffer[..FormatA1(buffer)]);
     }
 
     /// <summary>
@@ -168,12 +169,60 @@ public readonly struct RowCol : IEquatable<RowCol>
     /// <exception cref="InvalidOperationException">When <c>RowCol</c> doesn't use <em>R1C1</em> semantic.</exception>
     public string GetDisplayStringR1C1()
     {
-        if (!IsR1C1)
-            throw new InvalidOperationException("RowCol doesn't use R1C1 semantic.");
+        Span<char> buffer = stackalloc char[MaxDisplayLength];
+        return new string(buffer[..FormatR1C1(buffer)]);
+    }
 
-        var sb = new StringBuilder();
-        AppendR1C1(sb);
-        return sb.ToString();
+    /// <summary>
+    /// Get a reference in its own notation, <em>A1</em> or <em>R1C1</em> (see <see cref="Style"/>).
+    /// </summary>
+    public override string ToString()
+    {
+        Span<char> buffer = stackalloc char[MaxDisplayLength];
+        return new string(buffer[..Format(buffer)]);
+    }
+
+    /// <summary>
+    /// Get a reference in its own notation, <em>A1</em> or <em>R1C1</em> (see <see cref="Style"/>).
+    /// </summary>
+    /// <param name="format">Must be <c>null</c> or empty. There are no other formats.</param>
+    /// <param name="formatProvider">Not used. A reference does not depend on a culture.</param>
+    /// <exception cref="FormatException">The <paramref name="format"/> is not empty.</exception>
+    public string ToString(string? format, IFormatProvider? formatProvider)
+    {
+        CheckFormat(format);
+        return ToString();
+    }
+
+    /// <summary>
+    /// Write a reference in its own notation, <em>A1</em> or <em>R1C1</em> (see <see cref="Style"/>),
+    /// into the <paramref name="destination"/>.
+    /// </summary>
+    /// <param name="destination">The span where to write the reference.</param>
+    /// <param name="charsWritten">The number of written chars, or 0 if the destination is too short.</param>
+    /// <param name="format">Must be empty. There are no other formats.</param>
+    /// <param name="provider">Not used. A reference does not depend on a culture.</param>
+    /// <returns><c>true</c> if the reference was written, <c>false</c> if the destination is too short.</returns>
+    /// <exception cref="FormatException">The <paramref name="format"/> is not empty.</exception>
+    public bool TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format = default, IFormatProvider? provider = null)
+    {
+        CheckFormat(format);
+        Span<char> buffer = stackalloc char[MaxDisplayLength];
+        var length = Format(buffer);
+        if (!buffer[..length].TryCopyTo(destination))
+        {
+            charsWritten = 0;
+            return false;
+        }
+
+        charsWritten = length;
+        return true;
+    }
+
+    internal static void CheckFormat(ReadOnlySpan<char> format)
+    {
+        if (!format.IsEmpty)
+            throw new FormatException($"The format '{format}' is not supported. Use an empty format.");
     }
 
     /// <summary>
@@ -287,30 +336,33 @@ public readonly struct RowCol : IEquatable<RowCol>
         }
     }
 
-    internal void Append(StringBuilder sb)
+    /// <summary>
+    /// Write the reference in its own notation into the <paramref name="buffer"/>.
+    /// </summary>
+    /// <param name="buffer">A buffer with at least <see cref="MaxDisplayLength"/> chars.</param>
+    /// <returns>The number of written chars.</returns>
+    internal int Format(Span<char> buffer)
     {
-        if (IsA1)
-            AppendA1(sb);
-        else
-            AppendR1C1(sb);
+        return IsA1 ? FormatA1(buffer) : FormatR1C1(buffer);
     }
 
-    /// <inheritdoc cref="GetDisplayStringA1()"/>
-    /// <param name="sb">String buffer where to write the output.</param>
+    /// <inheritdoc cref="Format"/>
     /// <exception cref="InvalidOperationException">When <c>RowCol</c> is not in <em>A1</em> notation.</exception>
-    internal StringBuilder AppendA1(StringBuilder sb)
+    internal int FormatA1(Span<char> buffer)
     {
         if (!IsA1)
             throw new InvalidOperationException("RowCol doesn't use A1 semantic.");
 
+        var length = 0;
         switch (ColumnType)
         {
             case Absolute:
-                AppendA1Column(sb.Append('$'));
+                buffer[length++] = '$';
+                length += FormatA1Column(buffer[length..]);
                 break;
 
             case Relative:
-                AppendA1Column(sb);
+                length += FormatA1Column(buffer[length..]);
                 break;
 
             case None:
@@ -323,11 +375,12 @@ public readonly struct RowCol : IEquatable<RowCol>
         switch (RowType)
         {
             case Absolute:
-                sb.Append('$').Append(RowValue);
+                buffer[length++] = '$';
+                length += FormatNumber(buffer[length..], RowValue);
                 break;
 
             case Relative:
-                sb.Append(RowValue);
+                length += FormatNumber(buffer[length..], RowValue);
                 break;
 
             case None:
@@ -337,39 +390,42 @@ public readonly struct RowCol : IEquatable<RowCol>
                 throw new NotSupportedException();
         }
 
-        return sb;
+        return length;
     }
 
-    /// <inheritdoc cref="GetDisplayStringR1C1()"/>
-    /// <param name="sb">String buffer where to write the output.</param>
-    /// <exception cref="InvalidOperationException">When <c>RowCol</c> is not in <em>A1</em> notation.</exception>
-    internal void AppendR1C1(StringBuilder sb)
+    /// <inheritdoc cref="Format"/>
+    /// <exception cref="InvalidOperationException">When <c>RowCol</c> is not in <em>R1C1</em> notation.</exception>
+    internal int FormatR1C1(Span<char> buffer)
     {
         if (!IsR1C1)
             throw new InvalidOperationException("RowCol doesn't use R1C1 semantic.");
 
-        AppendAxis(sb, 'R', RowType, RowValue);
-        AppendAxis(sb, 'C', ColumnType, ColumnValue);
+        var length = FormatAxis(buffer, 'R', RowType, RowValue);
+        length += FormatAxis(buffer[length..], 'C', ColumnType, ColumnValue);
+        return length;
 
-        static void AppendAxis(StringBuilder sb, char axis, ReferenceAxisType type, int position)
+        static int FormatAxis(Span<char> buffer, char axis, ReferenceAxisType type, int position)
         {
             switch (type)
             {
                 case Absolute:
-                    sb.Append(axis).Append(position);
-                    break;
+                    buffer[0] = axis;
+                    return 1 + FormatNumber(buffer[1..], position);
 
                 case Relative when position != 0:
-                    sb.Append(axis).Append('[').Append(position).Append(']');
-                    break;
+                    buffer[0] = axis;
+                    buffer[1] = '[';
+                    var length = 2 + FormatNumber(buffer[2..], position);
+                    buffer[length] = ']';
+                    return length + 1;
 
                 case Relative:
                     // position is always 0
-                    sb.Append(axis);
-                    break;
+                    buffer[0] = axis;
+                    return 1;
 
                 case None:
-                    break;
+                    return 0;
 
                 default:
                     throw new NotSupportedException();
@@ -377,7 +433,17 @@ public readonly struct RowCol : IEquatable<RowCol>
         }
     }
 
-    private void AppendA1Column(StringBuilder sb)
+    /// <summary>
+    /// Write a number without culture. The minus sign of a culture (e.g. U+2212) is not valid in
+    /// a formula.
+    /// </summary>
+    private static int FormatNumber(Span<char> buffer, int number)
+    {
+        number.TryFormat(buffer, out var length, provider: CultureInfo.InvariantCulture);
+        return length;
+    }
+
+    private int FormatA1Column(Span<char> buffer)
     {
         // The largest int has 7 letters (26^7 > int.MaxValue). Fill the buffer from the end.
         Span<char> column = stackalloc char[7];
@@ -392,7 +458,8 @@ public readonly struct RowCol : IEquatable<RowCol>
             column[--start] = (char)('A' + index);
         } while (columnIndex > 0);
 
-        sb.Append(column.Slice(start));
+        column[start..].CopyTo(buffer);
+        return column.Length - start;
     }
 
     /// <summary>
