@@ -15,6 +15,19 @@ public class RefModVisitorTests
     }
 
     [Theory]
+    [Trait("Issue", "6")]
+    [InlineData("Old!B7", "Old", "Q3", "'Q3'!B7")]
+    [InlineData("Old!B7", "Old", "RC", "'RC'!B7")]
+    [InlineData("Old!B7:Old!C8", "Old", "R1C1", "'R1C1'!B7:'R1C1'!C8")]
+    [InlineData("SUM(Old!B7)", "Old", "2023", "SUM('2023'!B7)")]
+    public void ModifySheet_quotes_new_sheet_name_that_reads_as_reference(string formula, string oldSheetName, string newSheetName, string modifiedFormula)
+    {
+        // Excel writes such a name in apostrophes, for example 'Q3'!A1.
+        var factory = new FormulaVisitor { SheetMap = { { oldSheetName, newSheetName } } };
+        AssertChangesA1(formula, factory, modifiedFormula);
+    }
+
+    [Theory]
     [InlineData("Old!#REF!", "Old", null, "#REF!#REF!")]
     [InlineData("Old!#REF!", "Old", "New", "New!#REF!")]
     public void ErrorNode_can_modify_sheet(string formula, string oldSheetName, string? newSheetName, string modifiedFormula)
