@@ -77,6 +77,23 @@ public class ParseletIdentTests
     }
 
     [Theory]
+    [Trait("Issue", "6")]
+    [InlineData("RC!A1", typeof(SheetReferenceNode))]
+    [InlineData("R!A1", typeof(SheetReferenceNode))]
+    [InlineData("R1C1!A1", typeof(SheetReferenceNode))]
+    [InlineData("A01!B1", typeof(SheetReferenceNode))]
+    [InlineData("Sheet1:R1C1!A1", typeof(Reference3DNode))]
+    public void Can_parse_unquoted_sheet_name_that_reads_as_reference(string formula, Type expectedNodeType)
+    {
+        // An earlier version wrote such a sheet name without quotes, so the parser must still read it.
+        var parser = ParserFactory.Create(new F());
+        var root = parser.ParseFormula(formula, new Ctx());
+
+        Assert.Equal(expectedNodeType, root.GetType());
+        Assert.Equal(formula, root.GetDisplayString(A1));
+    }
+
+    [Theory]
     [InlineData("TRUE", true)]
     [InlineData("true", true)]
     [InlineData("FALSE", false)]

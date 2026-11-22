@@ -145,7 +145,7 @@ internal static class ParserExtensions
     public static bool TryGetUnquotedSheet<T, TContext>(this Parser<T, TContext> parser, Token identToken, out ReadOnlySpan<char> sheetName)
     {
         var text = identToken.GetText(parser.Input);
-        var isUnquotedSheet = NameUtils.IsSheetNameValid(text) && !NameUtils.ShouldQuote(text);
+        var isUnquotedSheet = NameUtils.IsSheetNameValid(text) && !NameUtils.HasCharacterThatNeedsQuotes(text);
         if (isUnquotedSheet)
         {
             sheetName = text;
