@@ -61,9 +61,9 @@ public class IdentCharacterTests
     [InlineData("\uFFFD!A1")] // The last valid char in the basic multilingual plane
     [InlineData("\U0001F600!A1")]
     [InlineData("TRUE!A1")]
-    [InlineData("Sheet! A1")] // The sheet prefix of the main lexer contains the spaces after the `!`
+    [InlineData("Sheet! A1")] // The sheet prefix of the lexer contains the spaces after the `!`
     [InlineData("\nSheet!A1")]
-    [InlineData("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!A1")] // The main parser does not check the length
+    [InlineData("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!A1")] // The parser does not check the length
     public void Parser_reads_unquoted_sheet(string formula)
     {
         Assert.IsType<SheetReferenceNode>(Parse(formula));
@@ -130,7 +130,7 @@ public class IdentCharacterTests
     [InlineData("a?:b!A1")]
     public void Parser_reads_name_that_is_not_a_sheet_as_operand_of_range(string formula)
     {
-        // A sheet name can not contain these chars, thus the first operand is a name.
+        // A sheet name can not contain these chars, so the first operand is a name.
         var node = Parse(formula);
 
         var range = Assert.IsType<BinaryNode>(node);
@@ -172,7 +172,7 @@ public class IdentCharacterTests
     [Trait("Issue", "16")]
     public void IsUnquotedSheetName_checks_sheet_name()
     {
-        // xUnit changes an unpaired surrogate in InlineData, thus the test has the values in code.
+        // xUnit changes an unpaired surrogate in InlineData, so the test has the values in code.
         Assert.False(NameUtils.IsUnquotedSheetName(""));
         Assert.True(NameUtils.IsUnquotedSheetName("a"));
         Assert.False(NameUtils.IsUnquotedSheetName("a b"));
