@@ -503,7 +503,8 @@ public class FormulaParser<TScalarValue, TNode, TContext>
     /// <remarks>
     /// The SPILL token includes the whitespaces before the <c>#</c>. Thus the lexer splits
     /// <c> #REF!</c> into a SPILL token <c> #</c> and a SINGLE_SHEET_PREFIX token <c>REF!</c>.
-    /// A spill operator cannot have a space before it, so these tokens are always the error.
+    /// A spill operator cannot have a space before it. If a space comes before the <c>#</c>
+    /// and no whitespace comes after it, the tokens are the <c>#REF!</c> error.
     /// </remarks>
     private bool IsSplitRefError()
     {
@@ -592,11 +593,14 @@ public class FormulaParser<TScalarValue, TNode, TContext>
 
                     // The SINGLE_SHEET_PREFIX token includes the whitespaces after the `!`.
                     // A reference after a whitespace is the next operand, not a part of the error.
+                    // The whitespaces are the text of the operator, thus the node ends at the `!`.
+                    var errorEnd = _tokenSource.StartIndex + GetCurrentToken().TrimEnd().Length;
                     var hasWhitespaceAfter = IsWhitespace(_input[_tokenSource.StartIndex + _tokenSource.Length - 1]);
                     Match(Token.SINGLE_SHEET_PREFIX);
-                    if (!hasWhitespaceAfter)
-                        MatchReferenceAfterRefError();
+                    if (hasWhitespaceAfter)
+                        return _factory.ErrorNode(_context, new SymbolRange(start, errorEnd), REF_ERROR.AsSpan());
 
+                    MatchReferenceAfterRefError();
                     return _factory.ErrorNode(_context, new SymbolRange(start, _tokenSource.StartIndex), REF_ERROR.AsSpan());
                 }
 

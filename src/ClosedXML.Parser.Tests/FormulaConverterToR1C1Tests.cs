@@ -34,6 +34,9 @@ public class FormulaConverterToR1C1Tests
     [InlineData("SUM(IF(TRUE,A1:C3) B2:D4)", "SUM(IF(TRUE,RC:R[2]C[2]) R[1]C[1]:R[3]C[3])")]
     [InlineData("SUM(A1:B2 #REF!)", "SUM(RC:R[1]C[1] #REF!)")]
     [InlineData("SUM(A1 #REF!$B$7)", "SUM(RC #REF!)")]
+    [InlineData("SUM(A1 #REF! B1)", "SUM(RC #REF! RC[1])")]
+    [InlineData("SUM(A1 #REF! (B1))", "SUM(RC #REF! (RC[1]))")]
+    [InlineData("SUM(FOO (A1))", "SUM(FOO (RC))")]
     public void Intersection_with_space_in_other_token(string a1, string r1c1)
     {
         Assert.Equal(r1c1, FormulaConverter.ToR1C1(a1, 1, 1));

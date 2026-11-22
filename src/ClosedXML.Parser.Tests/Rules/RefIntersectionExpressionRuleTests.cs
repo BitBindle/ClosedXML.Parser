@@ -98,6 +98,13 @@ public class RefIntersectionExpressionRuleTests
                     a1C3)
             };
 
+            // A function name cannot have a space before `(`, thus a name and braces are two operands.
+            yield return new object[]
+            {
+                "FOO (A1)",
+                new BinaryNode(BinaryOperation.Intersection, new NameNode("FOO"), a1)
+            };
+
             // INTRA_TABLE_REFERENCE takes the space.
             yield return new object[]
             {
