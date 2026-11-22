@@ -1,5 +1,4 @@
-﻿using ClosedXML.Parser.Pratt;
-using ClosedXML.Parser.Rolex;
+﻿using ClosedXML.Parser.Rolex;
 
 namespace ClosedXML.Parser.Tests;
 
@@ -38,7 +37,6 @@ public class UnpairedSurrogateTests
 
         Assert.Throws<ParsingException>(() => FormulaParser<ScalarValue, AstNode, Ctx>.CellFormulaA1(formula, new Ctx(), new F()));
         Assert.Throws<ParsingException>(() => FormulaParser<ScalarValue, AstNode, Ctx>.CellFormulaR1C1(formula, new Ctx(), new F()));
-        Assert.Throws<ParsingException>(() => ParserFactory.Create(new F()).ParseFormula(formula, new Ctx()));
     }
 
     [Theory]
