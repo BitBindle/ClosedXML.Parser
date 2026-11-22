@@ -92,7 +92,7 @@ internal class IdentParselet<TScalar, T, TContext> : IPrefixParselet<T, TContext
         // * Sheet1:Sheet2!A1
         // * Sheet1:Sheet2!A:B
         // * Sheet1:Sheet2!1:2
-        if (_parser.TryGetUnquotedSheet(token, out var startSheet) &&
+        if (_parser.TryGetUnquotedFirstSheet(token, out var startSheet) &&
             _parser.LookAhead(1).Type == TokenType.Range &&
             _parser.LookAhead(2) is { Type: TokenType.Ident } maybeEndSheetToken &&
             _parser.TryGetUnquotedSheet(maybeEndSheetToken, out var endSheet) &&

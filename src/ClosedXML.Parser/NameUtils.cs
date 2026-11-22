@@ -74,9 +74,8 @@ public static class NameUtils
     /// Does the name contain a character that needs quotes?
     /// </summary>
     /// <remarks>
-    /// The Pratt parser uses this method to find a sheet name without quotes. It does not
-    /// use <see cref="ShouldQuote"/>, because it must also read a name such as <c>RC</c>
-    /// that an earlier version wrote without quotes.
+    /// The writer uses this method. It quotes more sheet names than the parsers need, because
+    /// Excel also quotes them. The parsers use <see cref="IsUnquotedSheetName"/>.
     /// </remarks>
     /// <exception cref="ArgumentException">If name is empty.</exception>
     internal static bool HasCharacterThatNeedsQuotes(ReadOnlySpan<char> name)
@@ -199,27 +198,97 @@ public static class NameUtils
         return sheetName.IndexOfAny(InvalidSheetChars) == -1;
     }
 
+    /// <summary>
+    /// Is the text a valid defined name? The rule is the <c>NAME</c> token of the main parser and
+    /// the <c>name</c> rule of the grammar. The first char is <c>_</c>, <c>\</c>, an ASCII letter
+    /// or a char from U+0080. The next chars can also be ASCII digits, <c>.</c> and <c>?</c>.
+    /// </summary>
+    /// <remarks>
+    /// The method does not check the length, because the main parser does not check it.
+    /// A surrogate must be a part of a pair.
+    /// </remarks>
     internal static bool IsNameValid(ReadOnlySpan<char> name)
     {
-        if (name.Length is < 1 or > 255)
+        if (name.IsEmpty || !IsNameStartChar(name[0]))
             return false;
 
-        // TODO: Determine what is a valid name and make the method public.
-        // Alert box says:
-        // * Starts with a letter or underscore
-        // * no space or char that is not allowed
-        // A letter above U+FFFF is two chars in UTF-16, thus the method reads runes.
-        var isFirst = true;
-        foreach (var rune in name.EnumerateRunes())
+        for (var i = 1; i < name.Length; ++i)
         {
-            var isValid = Rune.IsLetter(rune) || (isFirst && rune.Value == '_');
-            if (!isValid)
+            var c = name[i];
+            if (!IsNameStartChar(c) && !char.IsAsciiDigit(c) && c is not '.' and not '?')
                 return false;
+        }
 
-            isFirst = false;
+        return !HasUnpairedSurrogate(name);
+
+        static bool IsNameStartChar(char c) => c is '_' or '\\' or >= '\u0080' || char.IsAsciiLetter(c);
+    }
+
+    /// <summary>
+    /// Can a formula contain the text as a sheet name without quotes? The rule is the
+    /// <c>SINGLE_SHEET_PREFIX</c> token of the main parser: each code point must be an
+    /// unquoted sheet name character (see <see cref="IsUnquotedSheetNameChar"/>).
+    /// </summary>
+    /// <remarks>
+    /// The method does not check the length, because the main parser does not check it.
+    /// A name such as <c>A1</c> or <c>RC</c> is valid, because an earlier version wrote such
+    /// names without quotes.
+    /// </remarks>
+    internal static bool IsUnquotedSheetName(ReadOnlySpan<char> text)
+    {
+        if (text.IsEmpty)
+            return false;
+
+        for (var i = 0; i < text.Length; ++i)
+        {
+            var c = text[i];
+            if (char.IsHighSurrogate(c) && i + 1 < text.Length && char.IsLowSurrogate(text[i + 1]))
+            {
+                // Each code point above U+FFFF is valid.
+                ++i;
+                continue;
+            }
+
+            if (!IsUnquotedSheetNameChar(c))
+                return false;
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Can an unquoted sheet name contain the code point? The set is the same as in the main
+    /// parser: tab, LF, CR, <c>"</c>, <c>$</c>, <c>.</c>, ASCII digits, <c>;</c>, <c>@</c>,
+    /// ASCII letters, <c>_</c>, <c>`</c>, <c>|</c> and each code point from <c>~</c>. A
+    /// surrogate, U+FFFE and U+FFFF are not valid.
+    /// </summary>
+    internal static bool IsUnquotedSheetNameChar(int codepoint)
+    {
+        return codepoint switch
+        {
+            '\t' or '\n' or '\r' or '"' or '$' or '.' or ';' or '@' or '|' => true,
+            >= '0' and <= '9' => true,
+            >= 'A' and <= 'Z' => true,
+            >= '_' and <= 'z' => true, // _, ` and a-z
+            >= '~' and < 0xD800 => true,
+            >= 0xE000 and <= 0xFFFD => true,
+            >= 0x10000 and <= 0x10FFFF => true,
+            _ => false,
+        };
+    }
+
+    private static bool HasUnpairedSurrogate(ReadOnlySpan<char> text)
+    {
+        for (var i = 0; i < text.Length; ++i)
+        {
+            var c = text[i];
+            if (char.IsHighSurrogate(c) && i + 1 < text.Length && char.IsLowSurrogate(text[i + 1]))
+                ++i;
+            else if (char.IsSurrogate(c))
+                return true;
+        }
+
+        return false;
     }
 
     /// <summary>

@@ -130,10 +130,6 @@ public class ParseletIdentTests
     [InlineData("sheet!$")]
     [InlineData("sheet!")]
     [InlineData("$")]
-    [InlineData("A01")]
-    [InlineData("A0")]
-    [InlineData("A1048577")]
-    [InlineData("XFE1")]
     [InlineData("sheet1:sheet2!")]
     [InlineData("sheet1:sheet2!A")]
     [InlineData("sheet1:sheet2!name")] // There is no such thing as 3D name

@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Xml;
 
 namespace ClosedXML.Parser.Pratt;
@@ -21,6 +20,8 @@ internal class Lexer
     private int _i; // Index of the first char of current code point _c in _input
     private int _width; // Number of chars of current code point _c in _input, 2 for a surrogate pair
     private int _c; // A current code point (including astral planes) or -1 if at the EOF
+    private int _sheetRunEnd; // End of the last run of unquoted sheet name chars that IsSheetPrefix found
+    private bool _sheetRunIsPrefix; // Is '!' after the run of unquoted sheet name chars that ends at _sheetRunEnd?
 
 
     static Lexer()
@@ -49,10 +50,13 @@ internal class Lexer
     public void Reset(string formula)
     {
         _input = formula ?? throw new ArgumentNullException();
+        _queue.Clear();
         _start = -1;
         _i = -1;
         _width = 1;
         _c = 0;
+        _sheetRunEnd = 0;
+        _sheetRunIsPrefix = false;
     }
 
     public Token Consume()
@@ -85,6 +89,18 @@ internal class Lexer
             return new Token(TokenType.Eof, 0, 0);
 
         _start = _i;
+
+        // Unquoted sheet name before '!', e.g. `1x!A1` or `a;b!A1`. Such a sheet name can contain
+        // chars that are not valid in other ident tokens. The main lexer selects the longest
+        // token, thus a text token that ends after the '!' wins, e.g. `"a!b"`.
+        if (NameUtils.IsUnquotedSheetNameChar(_c) && IsSheetPrefix(out var sheetEnd) &&
+            (_c != '"' || GetTextEnd() <= sheetEnd))
+        {
+            while (_i < sheetEnd)
+                Advance();
+
+            return T(TokenType.Ident);
+        }
 
         // Number
         if (IsDigit(_c))
@@ -357,7 +373,7 @@ internal class Lexer
                 IsAsciiLetter(c) || // name + A1
                 c == '$' || // A1
                 (c is '_' or '\\' or '?') || // name
-                (c > 0x7F && IsLetterOrLetterMark(c)); // name
+                c > 0x7F; // name
         }
 
         static bool IsIdentNext(int c)
@@ -407,13 +423,6 @@ internal class Lexer
             return (uint)((codepoint | 32) - 97) <= 25U;
         }
 
-        static bool IsLetterOrLetterMark(int codepoint)
-        {
-            // Letters are categories from 0 to OtherLetter category. Then there are NonSpacingMark (accents and such).
-            // The int overload also gives the category of a code point above U+FFFF.
-            return CharUnicodeInfo.GetUnicodeCategory(codepoint) <= UnicodeCategory.NonSpacingMark;
-        }
-
         // Is codepoint a character per XML 1.0 spec (2.2)?
         static bool IsXml10Char(int codepoint)
         {
@@ -423,6 +432,66 @@ internal class Lexer
 
             return codepoint <= 0x10FFFF;
         }
+    }
+
+    /// <summary>
+    /// Is a run of unquoted sheet name chars at the current position, and a '!' after it?
+    /// </summary>
+    /// <param name="end">Index after the last char of the run.</param>
+    private bool IsSheetPrefix(out int end)
+    {
+        // Each position in a run has the same end. Use the result of an earlier call for the
+        // same run, thus the lexer reads each char of a long run only once.
+        if (_i < _sheetRunEnd)
+        {
+            end = _sheetRunEnd;
+            return _sheetRunIsPrefix;
+        }
+
+        end = _i;
+        while (end < _input.Length)
+        {
+            var c = _input[end];
+            if (char.IsHighSurrogate(c) && end + 1 < _input.Length && char.IsLowSurrogate(_input[end + 1]))
+            {
+                // Each code point above U+FFFF is valid.
+                end += 2;
+                continue;
+            }
+
+            // An unpaired surrogate is not valid, thus the run ends.
+            if (!NameUtils.IsUnquotedSheetNameChar(c))
+                break;
+
+            ++end;
+        }
+
+        _sheetRunEnd = end;
+        _sheetRunIsPrefix = end < _input.Length && _input[end] == '!';
+        return _sheetRunIsPrefix;
+    }
+
+    /// <summary>
+    /// Get the index after a text token that starts at the current position, or -1 if the
+    /// text is not terminated.
+    /// </summary>
+    private int GetTextEnd()
+    {
+        var i = _i + 1;
+        while (i < _input.Length)
+        {
+            if (_input[i] == '"')
+            {
+                if (i + 1 >= _input.Length || _input[i + 1] != '"')
+                    return i + 1;
+
+                ++i;
+            }
+
+            ++i;
+        }
+
+        return -1;
     }
 
     private Token T(TokenType type)

@@ -17,8 +17,18 @@ internal class Parser<T, TContext>
     public T ParseFormula(string formula, TContext ctx)
     {
         Input = formula;
-        _lexer.Reset(formula);
-        return ParseExpression(ctx, 0).Value;
+
+        // The main parser trims whitespace at the end, thus the Pratt parser does too.
+        var trimmedLength = formula.AsSpan().TrimEnd().Length;
+        _lexer.Reset(trimmedLength == formula.Length ? formula : formula[..trimmedLength]);
+        var node = ParseExpression(ctx, 0);
+
+        // Each token must be a part of the expression.
+        var nextToken = _lexer.Peek();
+        if (nextToken.Type != TokenType.Eof)
+            throw new ParsingException($"The formula `{formula}` wasn't parsed correctly. The expression `{formula.AsSpan(node.Range.Start, node.Range.Length)}` was parsed, but the rest `{formula.AsSpan(nextToken.Range.Start, trimmedLength - nextToken.Range.Start)}` wasn't.");
+
+        return node.Value;
     }
 
     internal Node<T> ParseExpression(TContext ctx, int minBp)
@@ -51,7 +61,7 @@ internal class Parser<T, TContext>
         var token = _lexer.Consume();
 
         if (!_prefixParselets.TryGetValue(token.Type, out var parselet))
-            throw new InvalidOperationException($"No parselet found for {token.Type}.");
+            throw new ParsingException($"Unexpected token {token.Type} at position {token.Range.Start}.");
 
         return parselet.Parse(ctx, token);
     }

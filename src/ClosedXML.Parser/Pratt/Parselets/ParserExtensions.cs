@@ -141,11 +141,31 @@ internal static class ParserExtensions
         return false;
     }
 
+    /// <summary>
+    /// Is the token an unquoted sheet name, e.g. <c>Sheet</c> in <c>Sheet!A1</c>?
+    /// </summary>
     public static bool TryGetUnquotedSheet<T, TContext>(this Parser<T, TContext> parser, Token identToken, out ReadOnlySpan<char> sheetName)
     {
         var text = identToken.GetText(parser.Input);
-        var isUnquotedSheet = NameUtils.IsSheetNameValid(text) && !NameUtils.HasCharacterThatNeedsQuotes(text);
-        if (isUnquotedSheet)
+        if (NameUtils.IsUnquotedSheetName(text))
+        {
+            sheetName = text;
+            return true;
+        }
+
+        sheetName = default;
+        return false;
+    }
+
+    /// <summary>
+    /// Is the token an unquoted first sheet of a 3D reference, e.g. <c>Jan</c> in
+    /// <c>Jan:Dec!A1</c>? The main lexer reads the first sheet as a <c>NAME</c> token, thus
+    /// the sheet name must also be a valid name.
+    /// </summary>
+    public static bool TryGetUnquotedFirstSheet<T, TContext>(this Parser<T, TContext> parser, Token identToken, out ReadOnlySpan<char> sheetName)
+    {
+        var text = identToken.GetText(parser.Input);
+        if (NameUtils.IsUnquotedSheetName(text) && NameUtils.IsNameValid(text))
         {
             sheetName = text;
             return true;
