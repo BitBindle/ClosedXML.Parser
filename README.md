@@ -12,7 +12,7 @@ GitHub Packages needs authentication, also for a public package. Use a token wit
 
 The package ID is the same as the ID of the upstream package on nuget.org. The release workflow does not publish a version that nuget.org already has. Use package source mapping, so that NuGet gets `ClosedXML.Parser` only from the fork feed.
 
-Example `nuget.config`. It reads the user name and the token from the `GITHUB_USER` and `GITHUB_TOKEN` environment variables:
+This example `nuget.config` reads the user name and the token from the `GITHUB_USER` and `GITHUB_TOKEN` environment variables:
 
 ```xml
 <configuration>
@@ -46,7 +46,7 @@ Example `nuget.config`. It reads the user name and the token from the `GITHUB_US
 
 The library also has these helpers:
 
-* `FormulaConverter` changes a formula from A1 to R1C1 and from R1C1 to A1. It also changes the references in a formula.
+* `FormulaConverter` changes a formula from A1 to R1C1 and from R1C1 to A1. Its `ModifyA1` method changes a formula with a factory that you give, for example a subclass of `RefModVisitor`.
 * `ReferenceParser` parses a reference, for example `Sheet1!A1:B2`.
 * `NameUtils` finds when a sheet name needs quotes in a formula.
 
