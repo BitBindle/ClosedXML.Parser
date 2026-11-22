@@ -29,6 +29,31 @@ public class FormulaConverterToR1C1Tests
     }
 
     [Theory]
+    [InlineData("SUM((A1:C3) (B2:D4))", "SUM((RC:R[2]C[2]) (R[1]C[1]:R[3]C[3]))")]
+    [InlineData("SUM(A1:B2 (A1,B2))", "SUM(RC:R[1]C[1] (RC,R[1]C[1]))")]
+    [InlineData("SUM(IF(TRUE,A1:C3) B2:D4)", "SUM(IF(TRUE,RC:R[2]C[2]) R[1]C[1]:R[3]C[3])")]
+    [InlineData("SUM(A1:B2 #REF!)", "SUM(RC:R[1]C[1] #REF!)")]
+    [InlineData("SUM(A1 #REF!$B$7)", "SUM(RC #REF!)")]
+    [InlineData("SUM(A1 #REF! B1)", "SUM(RC #REF! RC[1])")]
+    [InlineData("SUM(A1 #REF! (B1))", "SUM(RC #REF! (RC[1]))")]
+    [InlineData("SUM(FOO (A1))", "SUM(FOO (RC))")]
+    public void Intersection_with_space_in_other_token(string a1, string r1c1)
+    {
+        Assert.Equal(r1c1, FormulaConverter.ToR1C1(a1, 1, 1));
+    }
+
+    [Theory]
+    [InlineData("SUM(((A1),B2))", "SUM(((RC),R[1]C[1]))")]
+    [InlineData("SUM((A1):B2)", "SUM((RC):R[1]C[1])")]
+    [InlineData("SUM(1+((A1) B2))", "SUM(1+((RC) R[1]C[1]))")]
+    public void Reference_operator_after_reference_in_braces(string a1, string r1c1)
+    {
+        // The parser first reads `(A1)` as a value. Then it reads the operator and uses
+        // `(A1)` as the first operand of a reference expression. The text must stay in place.
+        Assert.Equal(r1c1, FormulaConverter.ToR1C1(a1, 1, 1));
+    }
+
+    [Theory]
     [InlineData("SUM(#REF!$B$7)", "SUM(#REF!)")]
     [InlineData("SUM(Sheet!#REF!)", "SUM(Sheet!#REF!)")]
     [InlineData("SUM(#REF!#REF!)", "SUM(#REF!)")]
