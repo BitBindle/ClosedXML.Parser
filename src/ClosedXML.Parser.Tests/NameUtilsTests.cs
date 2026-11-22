@@ -37,6 +37,62 @@ public class NameUtilsTests
         Assert.Equal(shouldBeQuoted, NameUtils.ShouldQuote(sheetName));
     }
 
+    [Theory]
+    [Trait("Issue", "6")]
+    [InlineData("Q3")]
+    [InlineData("a1")]
+    [InlineData("A01")]
+    [InlineData("XFD1048576")]
+    [InlineData("xfd1")]
+    public void Name_that_reads_as_A1_reference_should_be_quoted(string sheetName)
+    {
+        // Without the quotes, the name is a reference to a cell, for example Q3!A1.
+        Assert.True(NameUtils.ShouldQuote(sheetName));
+    }
+
+    [Theory]
+    [Trait("Issue", "6")]
+    [InlineData("R")]
+    [InlineData("C")]
+    [InlineData("RC")]
+    [InlineData("rc")]
+    [InlineData("R1C1")]
+    [InlineData("R12")]
+    [InlineData("C3")]
+    [InlineData("RC5")]
+    [InlineData("R2C")]
+    public void Name_that_reads_as_R1C1_reference_should_be_quoted(string sheetName)
+    {
+        // A formula in R1C1 notation reads these names as references.
+        Assert.True(NameUtils.ShouldQuote(sheetName));
+    }
+
+    [Theory]
+    [Trait("Issue", "6")]
+    [InlineData("1")]
+    [InlineData("2023")]
+    [InlineData("9Sheet")]
+    public void Name_that_starts_with_digit_should_be_quoted(string sheetName)
+    {
+        Assert.True(NameUtils.ShouldQuote(sheetName));
+    }
+
+    [Theory]
+    [Trait("Issue", "6")]
+    [InlineData("A0")] // Row 0 does not exist.
+    [InlineData("XFE1")] // The last column is XFD.
+    [InlineData("A1048577")] // The last row is 1048576.
+    [InlineData("ABCD1")]
+    [InlineData("Q3Sales")]
+    [InlineData("RCX")]
+    [InlineData("R1C1R")]
+    [InlineData("CR")]
+    [InlineData("Sheet1")]
+    public void Name_that_is_not_reference_should_not_be_quoted(string sheetName)
+    {
+        Assert.False(NameUtils.ShouldQuote(sheetName));
+    }
+
     [Fact]
     public void Empty_name_is_not_valid_sheet_name()
     {

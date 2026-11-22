@@ -58,11 +58,27 @@ public static class NameUtils
     /// Sheet names can't contain <c>*</c>,<c>/</c>,<c>:</c>,<c>?</c>,<c>[</c>,<c>\</c>,
     /// <c>]</c>, but method doesn't check for that. Also, it can't start with <c>'</c>,
     /// though it can be non-first character.
+    /// A name that reads as an A1 or R1C1 reference, for example <c>Q3</c> or <c>RC</c>,
+    /// also needs quotes. Without the quotes, the formula refers to a cell or is not valid.
     /// </remarks>
     /// <param name="name">The name. Must be at least 1 char long.</param>
     /// <returns>True, if the sheet name should be quoted in formula.</returns>
     /// <exception cref="ArgumentException">If name is empty.</exception>
     public static bool ShouldQuote(ReadOnlySpan<char> name)
+    {
+        return HasCharacterThatNeedsQuotes(name) || IsA1Reference(name) || IsR1C1Reference(name);
+    }
+
+    /// <summary>
+    /// Does the name contain a character that needs quotes?
+    /// </summary>
+    /// <remarks>
+    /// The Pratt parser uses this method to find a sheet name without quotes. It does not
+    /// use <see cref="ShouldQuote"/>, because it must also read a name such as <c>RC</c>
+    /// that an earlier version wrote without quotes.
+    /// </remarks>
+    /// <exception cref="ArgumentException">If name is empty.</exception>
+    internal static bool HasCharacterThatNeedsQuotes(ReadOnlySpan<char> name)
     {
         if (name.Length == 0)
             throw new ArgumentException("Sheet name is empty.");
@@ -91,6 +107,83 @@ public static class NameUtils
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Does the name read as an A1 cell reference, for example <c>Q3</c> or <c>XFD1048576</c>?
+    /// </summary>
+    /// <remarks>
+    /// The method accepts a row number with leading zeros, for example <c>A01</c>. Quotes on
+    /// a name that does not need them are still valid.
+    /// </remarks>
+    private static bool IsA1Reference(ReadOnlySpan<char> name)
+    {
+        var letterCount = 0;
+        var column = 0;
+        while (letterCount < name.Length && IsAsciiLetter(name[letterCount]))
+        {
+            // The last column XFD has three letters.
+            if (++letterCount > 3)
+                return false;
+
+            column = column * 26 + char.ToUpperInvariant(name[letterCount - 1]) - 'A' + 1;
+        }
+
+        return letterCount > 0 && column <= RowCol.MaxCol && IsNumberInRange(name.Slice(letterCount), 1, RowCol.MaxRow);
+    }
+
+    /// <summary>
+    /// Does the name read as an R1C1 reference, for example <c>R</c>, <c>C</c>, <c>RC</c>,
+    /// <c>R2</c> or <c>R1C1</c>?
+    /// </summary>
+    /// <remarks>
+    /// The method accepts each row and column number. Quotes on a name that does not need
+    /// them are still valid.
+    /// </remarks>
+    private static bool IsR1C1Reference(ReadOnlySpan<char> name)
+    {
+        var i = 0;
+        var hasRow = i < name.Length && name[i] is 'R' or 'r';
+        if (hasRow)
+            i = SkipDigits(name, i + 1);
+
+        var hasColumn = i < name.Length && name[i] is 'C' or 'c';
+        if (hasColumn)
+            i = SkipDigits(name, i + 1);
+
+        return (hasRow || hasColumn) && i == name.Length;
+    }
+
+    private static bool IsAsciiLetter(char c) => c is >= 'A' and <= 'Z' or >= 'a' and <= 'z';
+
+    private static int SkipDigits(ReadOnlySpan<char> text, int index)
+    {
+        while (index < text.Length && text[index] is >= '0' and <= '9')
+            index++;
+
+        return index;
+    }
+
+    /// <summary>
+    /// Is the text a decimal number from <paramref name="min"/> to <paramref name="max"/>?
+    /// </summary>
+    private static bool IsNumberInRange(ReadOnlySpan<char> text, int min, int max)
+    {
+        if (text.Length == 0)
+            return false;
+
+        var value = 0;
+        foreach (var c in text)
+        {
+            if (c is < '0' or > '9')
+                return false;
+
+            // Above the maximum, the value does not increase. Thus it cannot overflow.
+            if (value <= max)
+                value = value * 10 + c - '0';
+        }
+
+        return value >= min && value <= max;
     }
 
     /// <summary>
