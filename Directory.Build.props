@@ -1,5 +1,5 @@
 <Project>
-  <!-- These properties apply to each project in the src folder. -->
+  <!-- These properties apply to each project in this repository. -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>

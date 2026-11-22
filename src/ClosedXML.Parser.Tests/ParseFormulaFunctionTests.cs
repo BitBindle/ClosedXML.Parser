@@ -2,6 +2,9 @@ using System.Text.Json;
 using ClosedXML.Parser.Function;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Abstractions;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ClosedXML.Parser.Tests;
 
@@ -74,6 +77,26 @@ public class ParseFormulaFunctionTests
 
         Assert.Null(result.StatusCode);
         using var json = JsonDocument.Parse(ToJson(result), new JsonDocumentOptions { MaxDepth = 256 });
+        Assert.Equal(99, CountNodes(json.RootElement.GetProperty("ast"), "+"));
+    }
+
+    [Fact]
+    [Trait("Issue", "4")]
+    public async Task Result_executor_writes_ast_as_json_to_response()
+    {
+        // The isolated worker host writes the JsonResult with the result executor of ASP.NET Core MVC.
+        var services = new ServiceCollection().AddLogging().AddMvcCore().Services.BuildServiceProvider();
+        var context = new DefaultHttpContext { RequestServices = services };
+        context.Request.QueryString = new QueryString("?formula=" + Uri.EscapeDataString(string.Join("+", Enumerable.Repeat("A1", 100))));
+        context.Response.Body = new MemoryStream();
+
+        var result = ParseFormula.Run(context.Request, CancellationToken.None);
+        await result.ExecuteResultAsync(new ActionContext(context, new RouteData(), new ActionDescriptor()));
+
+        Assert.Equal(StatusCodes.Status200OK, context.Response.StatusCode);
+        Assert.StartsWith("application/json", context.Response.ContentType);
+        context.Response.Body.Position = 0;
+        using var json = await JsonDocument.ParseAsync(context.Response.Body, new JsonDocumentOptions { MaxDepth = 256 }, CancellationToken.None);
         Assert.Equal(99, CountNodes(json.RootElement.GetProperty("ast"), "+"));
     }
 
