@@ -32,6 +32,12 @@ public class FormulaParser<TScalarValue, TNode, TContext>
     private Token _tokenSource;
     private int _tokenIndex = -1;
 
+    /// <summary>
+    /// The start index of a nested expression that the parser replaces as the first atom of a
+    /// <c>ref_expression</c>. See the backtrack in <see cref="AtomExpression"/>.
+    /// </summary>
+    private int _replacedAtomStart;
+
     // Current lookahead token index
     private int _la;
 
@@ -311,7 +317,9 @@ public class FormulaParser<TScalarValue, TNode, TContext>
                     if (isPureRef)
                     {
                         // Incorrect expectation, backtrack to the ref_expression
-                        // note the passed true argument for 'replaceFirstAtom'
+                        // note the passed true argument for 'replaceFirstAtom'.
+                        // The nodes of the ref_expression start at the start of the nested expression.
+                        _replacedAtomStart = start;
                         if (skipRangeUnion)
                             return RefImplicitExpression(true, nestedNode);
 
@@ -382,7 +390,7 @@ public class FormulaParser<TScalarValue, TNode, TContext>
 
     private TNode RefExpression(bool replaceFirstAtom = false, TNode? refAtom = default)
     {
-        var start = _tokenSource.StartIndex;
+        var start = GetStart(replaceFirstAtom);
         var leftNode = RefImplicitExpression(replaceFirstAtom, refAtom);
         while (_la == Token.COMMA)
         {
@@ -404,7 +412,7 @@ public class FormulaParser<TScalarValue, TNode, TContext>
     /// </summary>
     private TNode RefImplicitExpression(bool replaceFirstAtom = false, TNode? refAtom = default)
     {
-        var start = _tokenSource.StartIndex;
+        var start = GetStart(replaceFirstAtom);
         if (_la == Token.INTERSECT)
         {
             Consume();
@@ -417,11 +425,13 @@ public class FormulaParser<TScalarValue, TNode, TContext>
 
     private TNode RefIntersectionExpression(bool replaceFirstAtom = false, TNode? refAtom = default)
     {
-        var start = _tokenSource.StartIndex;
+        var start = GetStart(replaceFirstAtom);
         var leftNode = RefRangeExpression(replaceFirstAtom, refAtom);
-        while (_la == Token.SPACE)
+        while (IsIntersectionOperator())
         {
-            Consume();
+            if (_la == Token.SPACE)
+                Consume();
+
             var rightNode = RefRangeExpression();
             leftNode = _factory.BinaryNode(_context, new SymbolRange(start, _tokenSource.StartIndex), BinaryOperation.Intersection, leftNode, rightNode);
         }
@@ -429,9 +439,92 @@ public class FormulaParser<TScalarValue, TNode, TContext>
         return leftNode;
     }
 
+    /// <summary>
+    /// Is the parser at the intersection operator (a space) after a reference operand?
+    /// </summary>
+    /// <remarks>
+    /// The lexer gives a SPACE token only for a space that no other token takes. The tokens
+    /// OPEN_BRACE, CLOSE_BRACE, SPILL, SINGLE_SHEET_PREFIX and INTRA_TABLE_REFERENCE can include
+    /// the whitespaces around them. Thus the space of the operator can be in the previous token,
+    /// as in <c>(A1) B1</c> and <c>#REF! B1</c>, or in the current token, as in <c>A1 (B1)</c>
+    /// and <c>A1 #REF!</c>.
+    /// </remarks>
+    private bool IsIntersectionOperator()
+    {
+        if (_la == Token.SPACE)
+            return true;
+
+        if (IsSplitRefError())
+            return true;
+
+        return CanStartRefOperand(_la) && HasSpaceBeforeCurrentToken();
+    }
+
+    /// <summary>
+    /// Can the token be the first token of a <c>ref_range_expression</c>?
+    /// </summary>
+    private static bool CanStartRefOperand(int tokenType)
+    {
+        return tokenType is Token.REF_CONSTANT or Token.OPEN_BRACE or Token.A1_CELL
+            or Token.A1_SPAN_REFERENCE or Token.BANG_REFERENCE or Token.SHEET_RANGE_PREFIX
+            or Token.REF_FUNCTION_LIST or Token.NAME or Token.BOOK_PREFIX
+            or Token.SINGLE_SHEET_PREFIX or Token.INTRA_TABLE_REFERENCE;
+    }
+
+    /// <summary>
+    /// Is there a space between the last significant char of the previous token and the first
+    /// significant char of the current token?
+    /// </summary>
+    private bool HasSpaceBeforeCurrentToken()
+    {
+        // Skip the whitespaces at the start of the current token, e.g. in ` (`.
+        var index = _tokenSource.StartIndex;
+        var tokenEnd = _tokenSource.StartIndex + _tokenSource.Length;
+        while (index < tokenEnd && IsWhitespace(_input[index]))
+            index++;
+
+        // The whitespaces before the first significant char can also be at the end of the previous token, e.g. in `) `.
+        for (var i = index - 1; i >= 0 && IsWhitespace(_input[i]); --i)
+        {
+            if (_input[i] == ' ')
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// The whitespaces of the lexer grammar.
+    /// </summary>
+    private static bool IsWhitespace(char c) => c is ' ' or '\r' or '\n';
+
+    /// <summary>
+    /// Is the parser at a <c>#REF!</c> error after a space?
+    /// </summary>
+    /// <remarks>
+    /// The SPILL token includes the whitespaces before the <c>#</c>. Thus the lexer splits
+    /// <c> #REF!</c> into a SPILL token <c> #</c> and a SINGLE_SHEET_PREFIX token <c>REF!</c>.
+    /// A spill operator cannot have a space before it. If a space comes before the <c>#</c>
+    /// and no whitespace comes after it, the tokens are the <c>#REF!</c> error.
+    /// </remarks>
+    private bool IsSplitRefError()
+    {
+        if (_la != Token.SPILL || LL(1) != Token.SINGLE_SHEET_PREFIX)
+            return false;
+
+        // A SPILL token with a whitespace after the `#` is not a part of `#REF!`.
+        var spillToken = GetCurrentToken();
+        if (spillToken[spillToken.Length - 1] != '#' || !HasSpaceBeforeCurrentToken())
+            return false;
+
+        var prefixToken = _tokens[_tokenIndex + 1];
+        var prefix = _input.AsSpan(prefixToken.StartIndex, prefixToken.Length).TrimEnd();
+        return prefix.Equals("REF!".AsSpan(), StringComparison.OrdinalIgnoreCase);
+    }
+
     private TNode RefRangeExpression(bool replaceFirstAtom = false, TNode? refAtom = default)
     {
-        var start = _tokenSource.StartIndex;
+        var start = GetStart(replaceFirstAtom);
         var leftNode = RefSpillExpression(replaceFirstAtom, refAtom);
         while (_la == Token.COLON)
         {
@@ -453,9 +546,9 @@ public class FormulaParser<TScalarValue, TNode, TContext>
     /// </summary>
     private TNode RefSpillExpression(bool replaceFirstAtom = false, TNode? refAtom = default)
     {
-        var start = _tokenSource.StartIndex;
+        var start = GetStart(replaceFirstAtom);
         var refAtomNode = RefAtomExpression(replaceFirstAtom, refAtom);
-        if (_la == Token.SPILL)
+        if (_la == Token.SPILL && !IsSplitRefError())
         {
             Consume();
             return _factory.Unary(_context, new SymbolRange(start, _tokenSource.StartIndex), UnaryOperation.SpillRange, refAtomNode);
@@ -488,30 +581,28 @@ public class FormulaParser<TScalarValue, TNode, TContext>
                     Span<char> normalizedError = stackalloc char[errorToken.Length];
                     errorToken.ToUpperInvariant(normalizedError);
                     Match(Token.REF_CONSTANT);
-
-                    if (_la == Token.REF_CONSTANT)
-                    {
-                        // -> REF_CONSTANT REF_CONSTANT
-                        Match(Token.REF_CONSTANT);
-                    }
-                    else if (_la == Token.A1_CELL)
-                    {
-                        // -> REF_CONSTANT A1_CELL
-                        Match(Token.A1_CELL);
-                        if (_la == Token.COLON && LL(1) == Token.A1_CELL)
-                        {
-                            // -> REF_CONSTANT A1_CELL COLON A1_CELL
-                            Match(Token.COLON);
-                            Match(Token.A1_CELL);
-                        }
-                    }
-                    else if (_la == Token.A1_SPAN_REFERENCE)
-                    {
-                        // -> REF_CONSTANT A1_SPAN_REFERENCE
-                        Match(Token.A1_SPAN_REFERENCE);
-                    }
-
+                    MatchReferenceAfterRefError();
                     return _factory.ErrorNode(_context, new SymbolRange(start, _tokenSource.StartIndex), normalizedError);
+                }
+
+            // The ` #REF!` error after a space is a SPILL token and a SINGLE_SHEET_PREFIX token.
+            case Token.SPILL when IsSplitRefError():
+                {
+                    // The node starts at the `#`, not at the whitespaces before it.
+                    var start = _tokenSource.StartIndex + _tokenSource.Length - 1;
+                    Match(Token.SPILL);
+
+                    // The SINGLE_SHEET_PREFIX token includes the whitespaces after the `!`.
+                    // A reference after a whitespace is the next operand, not a part of the error.
+                    // The whitespaces are the text of the operator, thus the node ends at the `!`.
+                    var errorEnd = _tokenSource.StartIndex + GetCurrentToken().TrimEnd().Length;
+                    var hasWhitespaceAfter = IsWhitespace(_input[_tokenSource.StartIndex + _tokenSource.Length - 1]);
+                    Match(Token.SINGLE_SHEET_PREFIX);
+                    if (hasWhitespaceAfter)
+                        return _factory.ErrorNode(_context, new SymbolRange(start, errorEnd), REF_ERROR.AsSpan());
+
+                    MatchReferenceAfterRefError();
+                    return _factory.ErrorNode(_context, new SymbolRange(start, _tokenSource.StartIndex), REF_ERROR.AsSpan());
                 }
 
             case Token.OPEN_BRACE:
@@ -703,6 +794,41 @@ public class FormulaParser<TScalarValue, TNode, TContext>
         }
 
         throw UnexpectedTokenError();
+    }
+
+    /// <summary>
+    /// Match the optional reference after a <c>#REF!</c> error of a deleted sheet.
+    /// <code>
+    /// -> REF_CONSTANT
+    /// -> REF_CONSTANT REF_CONSTANT
+    /// -> REF_CONSTANT A1_CELL
+    /// -> REF_CONSTANT A1_CELL COLON A1_CELL
+    /// -> REF_CONSTANT A1_SPAN_REFERENCE
+    /// </code>
+    /// </summary>
+    private void MatchReferenceAfterRefError()
+    {
+        if (_la == Token.REF_CONSTANT)
+        {
+            // -> REF_CONSTANT REF_CONSTANT
+            Match(Token.REF_CONSTANT);
+        }
+        else if (_la == Token.A1_CELL)
+        {
+            // -> REF_CONSTANT A1_CELL
+            Match(Token.A1_CELL);
+            if (_la == Token.COLON && LL(1) == Token.A1_CELL)
+            {
+                // -> REF_CONSTANT A1_CELL COLON A1_CELL
+                Match(Token.COLON);
+                Match(Token.A1_CELL);
+            }
+        }
+        else if (_la == Token.A1_SPAN_REFERENCE)
+        {
+            // -> REF_CONSTANT A1_SPAN_REFERENCE
+            Match(Token.A1_SPAN_REFERENCE);
+        }
     }
 
     /// <summary>
@@ -1051,6 +1177,15 @@ public class FormulaParser<TScalarValue, TNode, TContext>
     private Exception Error(string message)
     {
         return new ParsingException($"Error at char {_tokenSource.StartIndex} of '{_input}': {message}");
+    }
+
+    /// <summary>
+    /// Get the start index of a node of a <c>ref_expression</c>.
+    /// </summary>
+    /// <param name="replaceFirstAtom">Does the node replace its first atom with a parsed nested expression?</param>
+    private int GetStart(bool replaceFirstAtom)
+    {
+        return replaceFirstAtom ? _replacedAtomStart : _tokenSource.StartIndex;
     }
 
     private ReadOnlySpan<char> GetCurrentToken()

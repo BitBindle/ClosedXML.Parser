@@ -73,6 +73,7 @@ ref_implicit_expression
         | ref_intersection_expression
         ;
 
+// The C# parser also finds the space of the operator in a brace, spill, prefix or table token.
 ref_intersection_expression
         : ref_range_expression (SPACE ref_range_expression)*
         ;
