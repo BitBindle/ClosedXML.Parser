@@ -47,7 +47,6 @@ internal class IdentParselet<TScalar, T, TContext> : IPrefixParselet<T, TContext
         if (_parser.TryGetUnquotedSheet(token, out var sheetNameSpan) && _parser.LookAhead(1).Type == TokenType.Bang)
         {
             // We are now in `sheet!` Parse local reference.
-            var sheetName = sheetNameSpan.ToString(); // String allocation, needed for the IAstFactory
             var bangToken = _parser.Consume(TokenType.Bang);
             var sheetWithBangRange = token.Range.ExtendRight(bangToken.Range);
 
@@ -60,7 +59,7 @@ internal class IdentParselet<TScalar, T, TContext> : IPrefixParselet<T, TContext
             if (_parser.TryReferenceA1(sheetRefToken, out var sheetArea, out var sheetAreaRange))
             {
                 var range = sheetWithBangRange.ExtendRight(sheetAreaRange);
-                var value = _factory.SheetReference(ctx, range, sheetName, sheetArea);
+                var value = _factory.SheetReference(ctx, range, sheetNameSpan, sheetArea);
                 return new Node<T>(value, range);
             }
 
@@ -68,7 +67,7 @@ internal class IdentParselet<TScalar, T, TContext> : IPrefixParselet<T, TContext
             if (_parser.TryGetName(sheetRefToken, out var name))
             {
                 var range = sheetWithBangRange.ExtendRight(sheetRefToken.Range);
-                var value = _factory.SheetName(ctx, range, sheetName, name.ToString()); // String allocation, needed for the IAstFactory
+                var value = _factory.SheetName(ctx, range, sheetNameSpan, name);
                 return new Node<T>(value, range);
             }
 
@@ -112,9 +111,7 @@ internal class IdentParselet<TScalar, T, TContext> : IPrefixParselet<T, TContext
                     .ExtendRight(sheetEndToken.Range)
                     .ExtendRight(bangToken.Range)
                     .ExtendRight(sheetRangeReferenceRange);
-                var startSheetString = startSheet.ToString(); // String allocation for the IAstFactory
-                var endSheetString = endSheet.ToString();
-                var value = _factory.Reference3D(ctx, range, startSheetString, endSheetString, sheetRangeReference);
+                var value = _factory.Reference3D(ctx, range, startSheet, endSheet, sheetRangeReference);
                 return new Node<T>(value, range);
             }
 
@@ -124,7 +121,7 @@ internal class IdentParselet<TScalar, T, TContext> : IPrefixParselet<T, TContext
         // Check for rowspan `name`
         if (_parser.TryGetName(token, out var workbookName))
         {
-            var value = _factory.Name(ctx, token.Range, workbookName.ToString()); // String allocation, needed for the IAstFactory
+            var value = _factory.Name(ctx, token.Range, workbookName);
             return new Node<T>(value, token.Range);
         }
 

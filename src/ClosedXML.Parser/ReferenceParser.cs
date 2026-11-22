@@ -178,7 +178,7 @@ public static class ReferenceParser
 
         var sheetPrefixToken = tokens[0];
         var sheetPrefix = text.AsSpan(sheetPrefixToken.StartIndex, sheetPrefixToken.Length);
-        TokenParser.ParseSingleSheetPrefix(sheetPrefix, out int? workbookIndex, out sheetName);
+        TokenParser.ParseSingleSheetPrefix(sheetPrefix, out int? workbookIndex, out var sheetNameSpan);
         if (workbookIndex is not null)
         {
             sheetName = string.Empty;
@@ -196,6 +196,7 @@ public static class ReferenceParser
 
         var referenceArea = text.AsSpan().Slice(sheetPrefixToken.Length);
         area = TokenParser.ParseReference(referenceArea, isA1: true);
+        sheetName = sheetNameSpan.ToString();
         return true;
     }
 
@@ -235,7 +236,7 @@ public static class ReferenceParser
 
         var sheetPrefixToken = tokens[0];
         var sheetPrefix = text.AsSpan(sheetPrefixToken.StartIndex, sheetPrefixToken.Length);
-        TokenParser.ParseSingleSheetPrefix(sheetPrefix, out int? workbookIndex, out sheetName);
+        TokenParser.ParseSingleSheetPrefix(sheetPrefix, out int? workbookIndex, out var sheetNameSpan);
         if (workbookIndex is not null)
         {
             sheetName = string.Empty;
@@ -244,6 +245,7 @@ public static class ReferenceParser
         }
 
         var nameToken = tokens[1];
+        sheetName = sheetNameSpan.ToString();
         name = text.AsSpan().Slice(nameToken.StartIndex, nameToken.Length).ToString();
         return true;
     }

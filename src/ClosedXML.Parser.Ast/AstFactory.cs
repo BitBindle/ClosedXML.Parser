@@ -14,9 +14,9 @@ public class F : IAstFactory<ScalarValue, AstNode, Ctx>
         return new ScalarValue("Number", value);
     }
 
-    public ScalarValue TextValue(Ctx _, SymbolRange range, string input)
+    public ScalarValue TextValue(Ctx _, SymbolRange range, ReadOnlySpan<char> input)
     {
-        return new ScalarValue("Text", input);
+        return new ScalarValue("Text", input.ToString());
     }
 
     public ScalarValue ErrorValue(Ctx _, SymbolRange range, ReadOnlySpan<char> error)
@@ -44,9 +44,9 @@ public class F : IAstFactory<ScalarValue, AstNode, Ctx>
         return new ValueNode("Number", value);
     }
 
-    public AstNode TextNode(Ctx _, SymbolRange range, string text)
+    public AstNode TextNode(Ctx _, SymbolRange range, ReadOnlySpan<char> text)
     {
-        return new ValueNode("Text", text);
+        return new ValueNode("Text", text.ToString());
     }
 
     public AstNode ArrayNode(Ctx _, SymbolRange range, int rows, int columns, IReadOnlyList<ScalarValue> array)
@@ -59,9 +59,9 @@ public class F : IAstFactory<ScalarValue, AstNode, Ctx>
         return new ReferenceNode(reference);
     }
 
-    public AstNode SheetReference(Ctx _, SymbolRange range, string sheet, ReferenceArea reference)
+    public AstNode SheetReference(Ctx _, SymbolRange range, ReadOnlySpan<char> sheet, ReferenceArea reference)
     {
-        return new SheetReferenceNode(sheet, reference);
+        return new SheetReferenceNode(sheet.ToString(), reference);
     }
 
     public AstNode BangReference(Ctx _, SymbolRange range, ReferenceArea reference)
@@ -69,19 +69,19 @@ public class F : IAstFactory<ScalarValue, AstNode, Ctx>
         return new BangReferenceNode(reference);
     }
 
-    public AstNode Reference3D(Ctx _, SymbolRange range, string firstSheet, string lastSheet, ReferenceArea reference)
+    public AstNode Reference3D(Ctx _, SymbolRange range, ReadOnlySpan<char> firstSheet, ReadOnlySpan<char> lastSheet, ReferenceArea reference)
     {
-        return new Reference3DNode(firstSheet, lastSheet, reference);
+        return new Reference3DNode(firstSheet.ToString(), lastSheet.ToString(), reference);
     }
 
-    public AstNode ExternalSheetReference(Ctx _, SymbolRange range, int workbookIndex, string sheet, ReferenceArea reference)
+    public AstNode ExternalSheetReference(Ctx _, SymbolRange range, int workbookIndex, ReadOnlySpan<char> sheet, ReferenceArea reference)
     {
-        return new ExternalSheetReferenceNode(workbookIndex, sheet, reference);
+        return new ExternalSheetReferenceNode(workbookIndex, sheet.ToString(), reference);
     }
 
-    public AstNode ExternalReference3D(Ctx _, SymbolRange range, int workbookIndex, string firstSheet, string lastSheet, ReferenceArea reference)
+    public AstNode ExternalReference3D(Ctx _, SymbolRange range, int workbookIndex, ReadOnlySpan<char> firstSheet, ReadOnlySpan<char> lastSheet, ReferenceArea reference)
     {
-        return new ExternalReference3DNode(workbookIndex, firstSheet, lastSheet, reference);
+        return new ExternalReference3DNode(workbookIndex, firstSheet.ToString(), lastSheet.ToString(), reference);
     }
 
     public AstNode Function(Ctx _, SymbolRange range, ReadOnlySpan<char> name, IReadOnlyList<AstNode> args)
@@ -89,14 +89,14 @@ public class F : IAstFactory<ScalarValue, AstNode, Ctx>
         return new FunctionNode(null, name.ToString()) { Children = args.ToArray() };
     }
 
-    public AstNode Function(Ctx _, SymbolRange range, string sheet, ReadOnlySpan<char> name, IReadOnlyList<AstNode> args)
+    public AstNode Function(Ctx _, SymbolRange range, ReadOnlySpan<char> sheet, ReadOnlySpan<char> name, IReadOnlyList<AstNode> args)
     {
-        return new FunctionNode(sheet, name.ToString()) { Children = args.ToArray() };
+        return new FunctionNode(sheet.ToString(), name.ToString()) { Children = args.ToArray() };
     }
 
-    public AstNode ExternalFunction(Ctx _, SymbolRange range, int workbookIndex, string sheetName, ReadOnlySpan<char> name, IReadOnlyList<AstNode> args)
+    public AstNode ExternalFunction(Ctx _, SymbolRange range, int workbookIndex, ReadOnlySpan<char> sheetName, ReadOnlySpan<char> name, IReadOnlyList<AstNode> args)
     {
-        return new ExternalFunctionNode(workbookIndex, sheetName, name.ToString())
+        return new ExternalFunctionNode(workbookIndex, sheetName.ToString(), name.ToString())
         {
             Children = args.ToArray()
         };
@@ -110,19 +110,19 @@ public class F : IAstFactory<ScalarValue, AstNode, Ctx>
         };
     }
 
-    public AstNode StructureReference(Ctx _, SymbolRange range, StructuredReferenceArea area, string? firstColumn, string? lastColumn)
+    public AstNode StructureReference(Ctx _, SymbolRange range, StructuredReferenceArea area, ReadOnlySpan<char> firstColumn, ReadOnlySpan<char> lastColumn)
     {
-        return new StructureReferenceNode(null, area, firstColumn, lastColumn);
+        return new StructureReferenceNode(null, area, ToColumn(firstColumn), ToColumn(lastColumn));
     }
 
-    public AstNode StructureReference(Ctx _, SymbolRange range, string table, StructuredReferenceArea area, string? firstColumn, string? lastColumn)
+    public AstNode StructureReference(Ctx _, SymbolRange range, ReadOnlySpan<char> table, StructuredReferenceArea area, ReadOnlySpan<char> firstColumn, ReadOnlySpan<char> lastColumn)
     {
-        return new StructureReferenceNode(table, area, firstColumn, lastColumn);
+        return new StructureReferenceNode(table.ToString(), area, ToColumn(firstColumn), ToColumn(lastColumn));
     }
 
-    public AstNode ExternalStructureReference(Ctx _, SymbolRange range, int workbookIndex, string table, StructuredReferenceArea area, string? firstColumn, string? lastColumn)
+    public AstNode ExternalStructureReference(Ctx _, SymbolRange range, int workbookIndex, ReadOnlySpan<char> table, StructuredReferenceArea area, ReadOnlySpan<char> firstColumn, ReadOnlySpan<char> lastColumn)
     {
-        return new ExternalStructureReferenceNode(workbookIndex, table, area, firstColumn, lastColumn);
+        return new ExternalStructureReferenceNode(workbookIndex, table.ToString(), area, ToColumn(firstColumn), ToColumn(lastColumn));
     }
 
     public AstNode CellFunction(Ctx _, SymbolRange range, RowCol cell, IReadOnlyList<AstNode> args)
@@ -133,29 +133,29 @@ public class F : IAstFactory<ScalarValue, AstNode, Ctx>
         };
     }
 
-    public AstNode Name(Ctx _, SymbolRange range, string name)
+    public AstNode Name(Ctx _, SymbolRange range, ReadOnlySpan<char> name)
     {
-        return new NameNode(name);
+        return new NameNode(name.ToString());
     }
 
-    public AstNode SheetName(Ctx _, SymbolRange range, string sheet, string name)
+    public AstNode SheetName(Ctx _, SymbolRange range, ReadOnlySpan<char> sheet, ReadOnlySpan<char> name)
     {
-        return new SheetNameNode(sheet, name);
+        return new SheetNameNode(sheet.ToString(), name.ToString());
     }
 
-    public AstNode BangName(Ctx context, SymbolRange range, string name)
+    public AstNode BangName(Ctx context, SymbolRange range, ReadOnlySpan<char> name)
     {
-        return new BangNameNode(name);
+        return new BangNameNode(name.ToString());
     }
 
-    public AstNode ExternalName(Ctx _, SymbolRange range, int workbookIndex, string name)
+    public AstNode ExternalName(Ctx _, SymbolRange range, int workbookIndex, ReadOnlySpan<char> name)
     {
-        return new ExternalNameNode(workbookIndex, name);
+        return new ExternalNameNode(workbookIndex, name.ToString());
     }
 
-    public AstNode ExternalSheetName(Ctx _, SymbolRange range, int workbookIndex, string sheet, string name)
+    public AstNode ExternalSheetName(Ctx _, SymbolRange range, int workbookIndex, ReadOnlySpan<char> sheet, ReadOnlySpan<char> name)
     {
-        return new ExternalSheetNameNode(workbookIndex, sheet, name);
+        return new ExternalSheetNameNode(workbookIndex, sheet.ToString(), name.ToString());
     }
 
     public AstNode BinaryNode(Ctx _, SymbolRange range, BinaryOperation operation, AstNode leftNode, AstNode rightNode)
@@ -172,5 +172,13 @@ public class F : IAstFactory<ScalarValue, AstNode, Ctx>
     {
         // The tree shape gives the precedence, so a node for the parentheses adds no data.
         return node;
+    }
+
+    /// <summary>
+    /// The AST nodes use null for a reference without a column.
+    /// </summary>
+    private static string? ToColumn(ReadOnlySpan<char> column)
+    {
+        return column.IsEmpty ? null : column.ToString();
     }
 }

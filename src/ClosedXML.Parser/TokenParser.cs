@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Buffers;
 using System.Diagnostics;
 using static ClosedXML.Parser.ReferenceAxisType;
 
@@ -8,16 +7,9 @@ namespace ClosedXML.Parser;
 internal static class TokenParser
 {
     /// <summary>
-    /// The maximum length of a buffer on the stack. A sheet name or a column name in a token has
-    /// no length limit, and a large buffer on the stack can overflow it. Thus a longer name uses
-    /// an array from the pool.
-    /// </summary>
-    private const int MaxStackBufferLength = 256;
-
-    /// <summary>
     /// Parse <see cref="Token.SINGLE_SHEET_PREFIX"/> token.
     /// </summary>
-    internal static void ParseSingleSheetPrefix(ReadOnlySpan<char> input, out int? index, out string sheetName)
+    internal static void ParseSingleSheetPrefix(ReadOnlySpan<char> input, out int? index, out ReadOnlySpan<char> sheetName)
     {
         // There can be whitespaces after exclamation mark at the end of a token.
         input = input.TrimEnd();
@@ -33,7 +25,7 @@ internal static class TokenParser
         if (!isEscaped)
         {
             // SHEET_NAME
-            sheetName = sheetRangeSpan.ToString();
+            sheetName = sheetRangeSpan;
             return;
         }
 
@@ -44,7 +36,7 @@ internal static class TokenParser
     /// <summary>
     /// Parse token <see cref="Token.SHEET_RANGE_PREFIX"/>
     /// </summary>
-    internal static void ParseSheetRangePrefix(ReadOnlySpan<char> input, out int? index, out string firstSheetName, out string secondSheetName)
+    internal static void ParseSheetRangePrefix(ReadOnlySpan<char> input, out int? index, out ReadOnlySpan<char> firstSheetName, out ReadOnlySpan<char> secondSheetName)
     {
         var isEscaped = input[0] == '\'';
         input = isEscaped
@@ -59,8 +51,8 @@ internal static class TokenParser
         {
             // SHEET_NAME ':' SHEET_NAME
             var endIndex = sheetRangeSpan.IndexOf(':');
-            firstSheetName = sheetRangeSpan.Slice(0, endIndex).ToString();
-            secondSheetName = sheetRangeSpan.Slice(endIndex + 1).ToString();
+            firstSheetName = sheetRangeSpan.Slice(0, endIndex);
+            secondSheetName = sheetRangeSpan.Slice(endIndex + 1);
             return;
         }
 
@@ -90,63 +82,70 @@ internal static class TokenParser
         return input.Slice(i + 1);
     }
 
-    private static string GetEscapedSheetName(ref ReadOnlySpan<char> input, char endChar)
+    private static ReadOnlySpan<char> GetEscapedSheetName(scoped ref ReadOnlySpan<char> input, char endChar)
     {
-        char[]? rented = null;
-        var buffer = input.Length <= MaxStackBufferLength
-            ? stackalloc char[MaxStackBufferLength]
-            : rented = ArrayPool<char>.Shared.Rent(input.Length);
-        try
+        var inputIdx = 0;
+        var tickCount = 0;
+        do
         {
-            var bufferIdx = 0;
-            var inputIdx = 0;
-            do
+            if (input[inputIdx] == '\'')
             {
-                if (input[inputIdx] == '\'')
-                    inputIdx++;
+                inputIdx++;
+                tickCount++;
+            }
 
-                buffer[bufferIdx++] = input[inputIdx++];
-            } while (input[inputIdx] != endChar);
+            inputIdx++;
+        } while (input[inputIdx] != endChar);
 
-            input = input.Slice(inputIdx + 1);
-            return buffer.Slice(0, bufferIdx).ToString();
-        }
-        finally
-        {
-            ReturnToPool(rented);
-        }
+        var sheetName = Unescape(input.Slice(0, inputIdx), tickCount);
+        input = input.Slice(inputIdx + 1);
+        return sheetName;
     }
 
-    private static string GetEscapedSheetName(ReadOnlySpan<char> input)
+    private static ReadOnlySpan<char> GetEscapedSheetName(ReadOnlySpan<char> input)
     {
-        char[]? rented = null;
-        var buffer = input.Length <= MaxStackBufferLength
-            ? stackalloc char[MaxStackBufferLength]
-            : rented = ArrayPool<char>.Shared.Rent(input.Length);
-        try
+        var inputIdx = 0;
+        var tickCount = 0;
+        do
         {
-            var bufferIdx = 0;
-            var inputIdx = 0;
-            do
+            if (input[inputIdx] == '\'')
             {
-                if (input[inputIdx] == '\'')
-                    inputIdx++;
+                inputIdx++;
+                tickCount++;
+            }
 
-                buffer[bufferIdx++] = input[inputIdx++];
-            } while (input.Length > inputIdx);
+            inputIdx++;
+        } while (input.Length > inputIdx);
 
-            return buffer.Slice(0, bufferIdx).ToString();
-        }
-        finally
-        {
-            ReturnToPool(rented);
-        }
+        return Unescape(input, tickCount);
     }
 
-    private static void ReturnToPool(char[]? rented)
+    /// <summary>
+    /// Remove the escape ticks from a name. A tick escapes the char after it.
+    /// </summary>
+    /// <remarks>
+    /// Most names have no escaped char, and their value is a slice of the input with no
+    /// allocation. A name with an escaped char gets a new string. A name has no length limit,
+    /// so the method uses no buffer on the stack.
+    /// </remarks>
+    /// <param name="escaped">The escaped name.</param>
+    /// <param name="tickCount">The number of escape ticks in the <paramref name="escaped"/> name.</param>
+    private static ReadOnlySpan<char> Unescape(ReadOnlySpan<char> escaped, int tickCount)
     {
-        if (rented is not null)
-            ArrayPool<char>.Shared.Return(rented);
+        if (tickCount == 0)
+            return escaped;
+
+        return string.Create(escaped.Length - tickCount, escaped, static (unescaped, escaped) =>
+        {
+            var unescapedIdx = 0;
+            for (var i = 0; i < escaped.Length; i++)
+            {
+                if (escaped[i] == '\'')
+                    i++;
+
+                unescaped[unescapedIdx++] = escaped[i];
+            }
+        });
     }
 
     internal static RowCol ExtractCellFunction(ReadOnlySpan<char> cellFunctionToken)
@@ -381,7 +380,7 @@ internal static class TokenParser
         return row;
     }
 
-    internal static void ParseIntraTableReference(ReadOnlySpan<char> input, out StructuredReferenceArea area, out string? firstColumn, out string? lastColumn)
+    internal static void ParseIntraTableReference(ReadOnlySpan<char> input, out StructuredReferenceArea area, out ReadOnlySpan<char> firstColumn, out ReadOnlySpan<char> lastColumn)
     {
         // Skip first char, it's always '['
         var i = 1;
@@ -389,8 +388,8 @@ internal static class TokenParser
         {
             // Pattern is a KEYWORD
             area = GetArea(input, i);
-            firstColumn = null;
-            lastColumn = null;
+            firstColumn = ReadOnlySpan<char>.Empty;
+            lastColumn = ReadOnlySpan<char>.Empty;
             return;
         }
 
@@ -402,8 +401,8 @@ internal static class TokenParser
             if (input[i] == ']')
             {
                 // Pattern is '[]', i.e. whole table.
-                firstColumn = null;
-                lastColumn = null;
+                firstColumn = ReadOnlySpan<char>.Empty;
+                lastColumn = ReadOnlySpan<char>.Empty;
                 return;
             }
 
@@ -412,7 +411,7 @@ internal static class TokenParser
             if (i < input.Length && input[i] == ':')
                 GetStructuredName(input, i + 1, out lastColumn);
             else
-                lastColumn = null;
+                lastColumn = ReadOnlySpan<char>.Empty;
 
             return;
         }
@@ -450,7 +449,7 @@ internal static class TokenParser
         if (i < input.Length && input[i] == ':')
             GetStructuredName(input, i + 1, out lastColumn);
         else
-            lastColumn = null;
+            lastColumn = ReadOnlySpan<char>.Empty;
     }
 
     private static int SkipComma(ReadOnlySpan<char> input, int i)
@@ -481,32 +480,23 @@ internal static class TokenParser
     /// <param name="input">Input span.</param>
     /// <param name="startIdx">First index of expected name. It will either contain a bracket or first letter of column name.</param>
     /// <param name="columnName">Parsed name.</param>
-    private static int GetStructuredName(ReadOnlySpan<char> input, int startIdx, out string columnName)
+    private static int GetStructuredName(ReadOnlySpan<char> input, int startIdx, out ReadOnlySpan<char> columnName)
     {
-        char[]? rented = null;
-        var buffer = input.Length <= MaxStackBufferLength
-            ? stackalloc char[MaxStackBufferLength]
-            : rented = ArrayPool<char>.Shared.Rent(input.Length);
-        try
+        var nameStart = startIdx + (input[startIdx] == '[' ? 1 : 0);
+        var i = nameStart;
+        var tickCount = 0;
+        var c = input[i];
+        for (; c is not ']' and not ':'; c = input[++i])
         {
-            var bufferIdx = 0;
-            var i = startIdx + (input[startIdx] == '[' ? 1 : 0);
-            var c = input[i];
-            for (; c is not ']' and not ':'; c = input[++i])
+            if (c == '\'')
             {
-                if (c == '\'')
-                    c = input[++i];
-
-                buffer[bufferIdx++] = c;
+                i++;
+                tickCount++;
             }
+        }
 
-            columnName = buffer.Slice(0, bufferIdx).ToString();
-            return i + (c == ']' ? 1 : 0); // char after last bracket
-        }
-        finally
-        {
-            ReturnToPool(rented);
-        }
+        columnName = Unescape(input.Slice(nameStart, i - nameStart), tickCount);
+        return i + (c == ']' ? 1 : 0); // char after last bracket
     }
 
     private static StructuredReferenceArea GetArea(ReadOnlySpan<char> input, int i)
