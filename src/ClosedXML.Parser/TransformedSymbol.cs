@@ -34,6 +34,16 @@ public readonly struct TransformedSymbol
     internal int Length => _transformedText?.Length ?? _range.End - _range.Start;
 
     /// <summary>
+    /// Is the text of the symbol the same as the text of its range in the <paramref name="formula"/>?
+    /// </summary>
+    /// <param name="formula">The formula of the parent node.</param>
+    /// <remarks>
+    /// A subclass of a visitor can create the symbol from a different formula string. Only a
+    /// symbol of the same formula string is a part of the parent text.
+    /// </remarks>
+    internal bool IsOriginalIn(string formula) => _transformedText is null && ReferenceEquals(_formulaText, formula);
+
+    /// <summary>
     /// Create a symbol that is different from what was in the original formula.
     /// </summary>
     /// <param name="formula">Text of whole formula.</param>

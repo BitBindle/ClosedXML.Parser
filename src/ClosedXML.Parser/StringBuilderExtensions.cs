@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Text;
 
 namespace ClosedXML.Parser;
@@ -49,11 +48,6 @@ internal static class StringBuilderExtensions
         return sb.Append('[').Append(bookIndex).Append(']');
     }
 
-    public static StringBuilder AppendFunction(this StringBuilder sb, ModContext ctx, SymbolRange range, ReadOnlySpan<char> functionName, IReadOnlyList<TransformedSymbol> arguments)
-    {
-        return sb.Append(functionName).AppendArguments(ctx, range, arguments);
-    }
-
     public static StringBuilder AppendRef(this StringBuilder sb, ReferenceArea? reference)
     {
         return reference is null ? sb.Append("#REF!") : reference.Value.Append(sb);
@@ -68,60 +62,12 @@ internal static class StringBuilderExtensions
         return sb;
     }
 
-    public static StringBuilder AppendStartFragment(this StringBuilder sb, ModContext ctx, SymbolRange symbolRange, TransformedSymbol nestedNode)
-    {
-        return sb.AppendFormulaPart(ctx, symbolRange.Start, nestedNode.OriginalRange.Start);
-    }
-
-    public static StringBuilder AppendMiddleFragment(this StringBuilder sb, ModContext ctx, TransformedSymbol beforeNode, TransformedSymbol afterNode)
-    {
-        return sb.AppendFormulaPart(ctx, beforeNode.OriginalRange.End, afterNode.OriginalRange.Start);
-    }
-
-    public static StringBuilder AppendEndFragment(this StringBuilder sb, ModContext ctx, SymbolRange symbolRange, TransformedSymbol nestedNode)
-    {
-        return sb.AppendFormulaPart(ctx, nestedNode.OriginalRange.End, symbolRange.End);
-    }
-
-    public static StringBuilder AppendArguments(this StringBuilder sb, ModContext ctx, SymbolRange range, IReadOnlyList<TransformedSymbol> arguments)
-    {
-        if (arguments.Count == 0)
-        {
-            var braceIdx = GetStartBraceIndex(ctx, range, range.End);
-            var braces = ctx.Formula.AsSpan().Slice(braceIdx, range.End - braceIdx);
-            sb.Append(braces);
-        }
-        else
-        {
-            sb
-                .AppendStartBrace(ctx, range, arguments[0])
-                .AppendArguments(ctx, arguments)
-                .AppendEndFragment(ctx, range, arguments[arguments.Count - 1]);
-        }
-
-        return sb;
-    }
-
-    private static StringBuilder AppendStartBrace(this StringBuilder sb, ModContext ctx, SymbolRange range, TransformedSymbol firstNode)
-    {
-        var firstNodeStart = firstNode.OriginalRange.Start;
-        var braceIdx = GetStartBraceIndex(ctx, range, firstNodeStart);
-        return sb.AppendFormulaPart(ctx, braceIdx, firstNodeStart);
-    }
-
     /// <summary>
-    /// Append the part of the original formula from <paramref name="start"/> (inclusive) to
-    /// <paramref name="end"/> (exclusive). Append nothing when the part is empty.
+    /// Get the index of the opening brace of a function. The brace is the last <c>(</c> before
+    /// <paramref name="nodeStart"/>, the start of the first argument (or the end of the function
+    /// without arguments).
     /// </summary>
-    private static StringBuilder AppendFormulaPart(this StringBuilder sb, ModContext ctx, int start, int end)
-    {
-        if (start < end)
-            sb.Append(ctx.Formula.AsSpan(start, end - start));
-
-        return sb;
-    }
-
-    private static int GetStartBraceIndex(ModContext ctx, SymbolRange range, int nodeStart)
+    internal static int GetStartBraceIndex(ModContext ctx, SymbolRange range, int nodeStart)
     {
         var formula = ctx.Formula;
         var braceIdx = nodeStart - 1;
@@ -132,19 +78,5 @@ internal static class StringBuilderExtensions
         }
 
         throw new InvalidOperationException("No opening brace found.");
-    }
-
-    private static StringBuilder AppendArguments(this StringBuilder sb, ModContext ctx, IReadOnlyList<TransformedSymbol> arguments)
-    {
-        if (arguments.Count > 0)
-            sb.Append(arguments[0].AsSpan());
-
-        for (var i = 1; i < arguments.Count; ++i)
-        {
-            sb.AppendMiddleFragment(ctx, arguments[i - 1], arguments[i]);
-            sb.Append(arguments[i].AsSpan());
-        }
-
-        return sb;
     }
 }
