@@ -70,29 +70,17 @@ internal static class StringBuilderExtensions
 
     public static StringBuilder AppendStartFragment(this StringBuilder sb, ModContext ctx, SymbolRange symbolRange, TransformedSymbol nestedNode)
     {
-        var formula = ctx.Formula;
-        for (var i = symbolRange.Start; i < nestedNode.OriginalRange.Start; ++i)
-            sb.Append(formula[i]);
-
-        return sb;
+        return sb.AppendFormulaPart(ctx, symbolRange.Start, nestedNode.OriginalRange.Start);
     }
 
     public static StringBuilder AppendMiddleFragment(this StringBuilder sb, ModContext ctx, TransformedSymbol beforeNode, TransformedSymbol afterNode)
     {
-        var formula = ctx.Formula;
-        for (var i = beforeNode.OriginalRange.End; i < afterNode.OriginalRange.Start; ++i)
-            sb.Append(formula[i]);
-
-        return sb;
+        return sb.AppendFormulaPart(ctx, beforeNode.OriginalRange.End, afterNode.OriginalRange.Start);
     }
 
     public static StringBuilder AppendEndFragment(this StringBuilder sb, ModContext ctx, SymbolRange symbolRange, TransformedSymbol nestedNode)
     {
-        var formula = ctx.Formula;
-        for (var i = nestedNode.OriginalRange.End; i < symbolRange.End; ++i)
-            sb.Append(formula[i]);
-
-        return sb;
+        return sb.AppendFormulaPart(ctx, nestedNode.OriginalRange.End, symbolRange.End);
     }
 
     public static StringBuilder AppendArguments(this StringBuilder sb, ModContext ctx, SymbolRange range, IReadOnlyList<TransformedSymbol> arguments)
@@ -118,8 +106,17 @@ internal static class StringBuilderExtensions
     {
         var firstNodeStart = firstNode.OriginalRange.Start;
         var braceIdx = GetStartBraceIndex(ctx, range, firstNodeStart);
-        for (var j = braceIdx; j < firstNodeStart; ++j)
-            sb.Append(ctx.Formula[j]);
+        return sb.AppendFormulaPart(ctx, braceIdx, firstNodeStart);
+    }
+
+    /// <summary>
+    /// Append the part of the original formula from <paramref name="start"/> (inclusive) to
+    /// <paramref name="end"/> (exclusive). Append nothing when the part is empty.
+    /// </summary>
+    private static StringBuilder AppendFormulaPart(this StringBuilder sb, ModContext ctx, int start, int end)
+    {
+        if (start < end)
+            sb.Append(ctx.Formula.AsSpan(start, end - start));
 
         return sb;
     }

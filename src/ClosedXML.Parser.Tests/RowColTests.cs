@@ -37,4 +37,35 @@ public class RowColTests
         var refA1 = TokenParser.ParseReference(a1, true).First;
         Assert.Equal(refA1, refR1C1.ToA1(row, col));
     }
+
+    [Theory]
+    [Trait("Issue", "21")]
+    [InlineData(1, "A1")]
+    [InlineData(26, "Z1")]
+    [InlineData(27, "AA1")]
+    [InlineData(52, "AZ1")]
+    [InlineData(53, "BA1")]
+    [InlineData(702, "ZZ1")]
+    [InlineData(703, "AAA1")]
+    [InlineData(16384, "XFD1")]
+    [InlineData(int.MaxValue, "FXSHRXW1")]
+    public void Relative_column_has_letters_of_column_number(int column, string expected)
+    {
+        var rowCol = new RowCol(Relative, 1, Relative, column, A1);
+
+        Assert.Equal(expected, rowCol.GetDisplayStringA1());
+    }
+
+    [Theory]
+    [Trait("Issue", "21")]
+    [InlineData(Absolute, Absolute, "$XFD$7")]
+    [InlineData(Absolute, Relative, "$XFD7")]
+    [InlineData(Relative, Absolute, "XFD$7")]
+    [InlineData(None, Absolute, "$7")]
+    public void Dollar_sign_comes_before_each_absolute_axis(ReferenceAxisType columnType, ReferenceAxisType rowType, string expected)
+    {
+        var rowCol = new RowCol(rowType, 7, columnType, columnType == None ? 0 : 16384, A1);
+
+        Assert.Equal(expected, rowCol.GetDisplayStringA1());
+    }
 }

@@ -306,11 +306,11 @@ public readonly struct RowCol : IEquatable<RowCol>
         switch (ColumnType)
         {
             case Absolute:
-                sb.Append('$').Append(GetA1Reference());
+                AppendA1Column(sb.Append('$'));
                 break;
 
             case Relative:
-                sb.Append(GetA1Reference());
+                AppendA1Column(sb);
                 break;
 
             case None:
@@ -377,20 +377,22 @@ public readonly struct RowCol : IEquatable<RowCol>
         }
     }
 
-    private string GetA1Reference()
+    private void AppendA1Column(StringBuilder sb)
     {
+        // The largest int has 7 letters (26^7 > int.MaxValue). Fill the buffer from the end.
+        Span<char> column = stackalloc char[7];
+        var start = column.Length;
         var columnIndex = ColumnValue;
-        var column = string.Empty;
         do
         {
             columnIndex -= 1;
             var index = columnIndex % 26;
             columnIndex -= index;
             columnIndex /= 26;
-            column = (char)('A' + index) + column;
+            column[--start] = (char)('A' + index);
         } while (columnIndex > 0);
 
-        return column;
+        sb.Append(column.Slice(start));
     }
 
     /// <summary>
