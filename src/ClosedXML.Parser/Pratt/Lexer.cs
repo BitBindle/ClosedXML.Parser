@@ -407,7 +407,7 @@ internal class Lexer
 
         static bool IsLetterOrLetterMark(int codepoint)
         {
-            // TODO: Only netstandard 2.1 has a parameter of type int, 2.0 has only char.
+            // The lexer does not accept a code point above U+FFFF as a letter.
             if (codepoint > 0xFFFF)
                 return false; // No letters from astral planes for us :(
 

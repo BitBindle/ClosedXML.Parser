@@ -11,7 +11,8 @@
     <RepositoryUrl>https://github.com/ClosedXML/ClosedXML.Parser</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
 
-    <!-- The tests use internal types, so all assemblies have the same strong name key. -->
+    <!-- InternalsVisibleTo in ClosedXML.Parser needs the public key of the test assembly.
+         All projects use the same key, so a signed assembly references only signed assemblies. -->
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)src/ClosedXML.Parser.snk</AssemblyOriginatorKeyFile>
   </PropertyGroup>
