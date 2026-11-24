@@ -1,6 +1,6 @@
 name: Release
 
-# A person starts this workflow. It builds and tests the commit, publishes the NuGet package to GitHub Packages
+# A person starts this workflow. It builds and tests the commit, publishes the NuGet package to nuget.org
 # and creates a GitHub release with generated release notes.
 #
 # VersionMajorMinor in Directory.Build.props sets the major and minor version. The patch version is the highest
@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write   # Create the tag and the release
-      packages: write   # Push the package to GitHub Packages
+      id-token: write   # Get a short-lived nuget.org API key with trusted publishing
 
     steps:
       - name: Checkout code
@@ -49,6 +49,22 @@ jobs:
           echo "version=$version" >> "$GITHUB_ENV"
           echo "Releasing $version" >> "$GITHUB_STEP_SUMMARY"
           echo "Releasing $version"
+
+      - name: Check that nuget.org does not have the version
+        # nuget.org refuses a version that it already has. The check stops the workflow before it creates the tag.
+        # The flat container returns 404 when the package ID does not exist yet. This is the case for the first release.
+        run: |
+          url="https://api.nuget.org/v3-flatcontainer/bitbindle.closedxml.parser/index.json"
+          status="$(curl --silent --show-error --output versions.json --write-out '%{http_code}' "$url")"
+          if [[ "$status" == 200 ]]; then
+            if jq --exit-status --arg v "${version,,}" '.versions | index($v)' versions.json > /dev/null; then
+              echo "::error::nuget.org already has BitBindle.ClosedXML.Parser $version. Change VersionMajorMinor or VersionSuffix in Directory.Build.props."
+              exit 1
+            fi
+          elif [[ "$status" != 404 ]]; then
+            echo "::error::nuget.org returned HTTP $status for $url"
+            exit 1
+          fi
 
       - name: Restore dependencies
         run: dotnet restore ClosedXML.Parser.slnx
@@ -85,15 +101,24 @@ jobs:
           git tag "$version" "$GITHUB_SHA"
           git push origin "refs/tags/$version"
 
-      - name: Push to GitHub Packages
-        # GitHub Packages does not accept symbol packages (.snupkg), so the package contains the pdb.
-        # GitHub Packages refuses a version that it already has, so a version is never published two times.
+      - name: Log in to nuget.org
+        # Trusted publishing. The action exchanges the OIDC token of the workflow for a short-lived API key.
+        # The secret NUGET_USER holds the nuget.org user name (not the e-mail address) of the policy owner.
         if: ${{ !inputs.dry_run }}
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Push to nuget.org
+        # The push of a .nupkg also pushes the .snupkg symbol package in the same folder.
+        if: ${{ !inputs.dry_run }}
+        env:
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
         run: >
           dotnet nuget push "artifacts/*.nupkg"
-          --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
-          --api-key "${{ secrets.GITHUB_TOKEN }}"
-          --no-symbols
+          --source "https://api.nuget.org/v3/index.json"
+          --api-key "$NUGET_API_KEY"
 
       - name: Create GitHub release
         if: ${{ !inputs.dry_run }}
@@ -102,5 +127,5 @@ jobs:
         run: |
           prerelease=()
           [[ "$version" == *-* ]] && prerelease=(--prerelease)
-          gh release create "$version" artifacts/*.nupkg \
+          gh release create "$version" artifacts/*.nupkg artifacts/*.snupkg \
             --verify-tag --title "$version" --generate-notes "${prerelease[@]}"
