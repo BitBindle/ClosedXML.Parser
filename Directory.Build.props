@@ -16,7 +16,7 @@
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
 
-    <Authors>Jan Havlíček</Authors>
+    <Authors>Jan Havlíček, BitBindle</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/BitBindle/closedxml.parser</PackageProjectUrl>
     <RepositoryUrl>https://github.com/BitBindle/closedxml.parser</RepositoryUrl>
