@@ -6,11 +6,11 @@ This repository is a fork of [ClosedXML.Parser](https://github.com/ClosedXML/Clo
 
 ## Package
 
-The release workflow publishes the `ClosedXML.Parser` package to the GitHub Packages NuGet feed of BitBindle. The package targets `net10.0`.
+The release workflow publishes the `BitBindle.ClosedXML.Parser` package to the GitHub Packages NuGet feed of BitBindle. The package targets `net10.0`.
+
+The package ID differs from the ID of the upstream package (`ClosedXML.Parser`). The assembly name and the namespaces stay `ClosedXML.Parser`. A project cannot reference both packages, because they contain the same assembly name. The upstream `ClosedXML` package depends on the upstream `ClosedXML.Parser` package. The fork does not support a project that uses both `ClosedXML` and this package.
 
 GitHub Packages needs authentication, also for a public package. Use a token with the `read:packages` scope.
-
-The package ID is the same as the ID of the upstream package on nuget.org. The release workflow does not publish a version that nuget.org already has. Use package source mapping, so that NuGet gets `ClosedXML.Parser` only from the fork feed.
 
 This example `nuget.config` reads the user name and the token from the `GITHUB_USER` and `GITHUB_TOKEN` environment variables:
 
@@ -28,7 +28,7 @@ This example `nuget.config` reads the user name and the token from the `GITHUB_U
   </packageSourceCredentials>
   <packageSourceMapping>
     <packageSource key="github-bitbindle">
-      <package pattern="ClosedXML.Parser" />
+      <package pattern="BitBindle.*" />
     </packageSource>
     <packageSource key="nuget.org">
       <package pattern="*" />

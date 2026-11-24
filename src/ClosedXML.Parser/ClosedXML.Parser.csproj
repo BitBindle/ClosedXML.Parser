@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <PackageId>ClosedXML.Parser</PackageId>
+    <PackageId>BitBindle.ClosedXML.Parser</PackageId>
     <PackageTags>ClosedXML;parser;formula;xlsx</PackageTags>
     <Description>
       A lexer and parser of Excel formulas with focus on performance. Its goal is to create
