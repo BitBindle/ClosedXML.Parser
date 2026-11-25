@@ -61,6 +61,8 @@ Thus:
 * An external reference must use the index of an external file, for example `[5]`.
 * Other formula grammars, for example `[1]!'Some name in external wb'`, are out of scope.
 
+The maximum of nesting levels depends on the stack of the thread. If the stack does not have sufficient space for the next level, the parser throws `ParsingException`. The runtime keeps the last 128 KB of the stack free, so a thread with a stack of 1 MB or more parses much more than the 64 nesting levels of Excel.
+
 ## Development
 
 [AGENTS.md](https://github.com/BitBindle/closedxml.parser/blob/develop/AGENTS.md) gives the rules for each change, and the commands to build, test and check the code. The short form:
