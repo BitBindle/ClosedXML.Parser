@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using ClosedXML.Parser.Rolex;
 
 namespace ClosedXML.Parser;
@@ -63,7 +64,7 @@ public class FormulaParser<TScalarValue, TNode, TContext>
     /// <param name="formula">Formula text that will be parsed.</param>
     /// <param name="context">Context that is going to be passed to every method of the <paramref name="factory"/>.</param>
     /// <param name="factory">Factory to create nodes of AST tree.</param>
-    /// <exception cref="ParsingException">If the formula doesn't satisfy the grammar.</exception>
+    /// <exception cref="ParsingException">If the formula doesn't satisfy the grammar, or if the formula has more nesting levels than the stack of the thread can hold.</exception>
     public static TNode CellFormulaA1(string formula, TContext context, IAstFactory<TScalarValue, TNode, TContext> factory)
     {
         var parser = new FormulaParser<TScalarValue, TNode, TContext>(formula, context, factory, true);
@@ -76,7 +77,7 @@ public class FormulaParser<TScalarValue, TNode, TContext>
     /// <param name="formula">Formula text that will be parsed.</param>
     /// <param name="context">Context that is going to be passed to every method of the <paramref name="factory"/>.</param>
     /// <param name="factory">Factory to create nodes of AST tree.</param>
-    /// <exception cref="ParsingException">If the formula doesn't satisfy the grammar.</exception>
+    /// <exception cref="ParsingException">If the formula doesn't satisfy the grammar, or if the formula has more nesting levels than the stack of the thread can hold.</exception>
     public static TNode CellFormulaR1C1(string formula, TContext context, IAstFactory<TScalarValue, TNode, TContext> factory)
     {
         var parser = new FormulaParser<TScalarValue, TNode, TContext>(formula, context, factory, false);
@@ -103,6 +104,7 @@ public class FormulaParser<TScalarValue, TNode, TContext>
 
     private TNode Expression(bool skipRangeUnion, out bool isPureRef)
     {
+        EnsureStack();
         var start = _tokenSource.StartIndex;
         var leftNode = ConcatExpression(skipRangeUnion, out isPureRef);
         while (true)
@@ -274,6 +276,7 @@ public class FormulaParser<TScalarValue, TNode, TContext>
         }
 
         Consume();
+        EnsureStack();
         var neutralAtom = PrefixAtomExpression(skipRangeUnion, out _);
         isPureRef = false;
         return _factory.Unary(_context, new SymbolRange(start, _tokenSource.StartIndex), op, neutralAtom);
@@ -418,6 +421,7 @@ public class FormulaParser<TScalarValue, TNode, TContext>
         if (_la == Token.INTERSECT && !replaceFirstAtom)
         {
             Consume();
+            EnsureStack();
             var refNode = RefImplicitExpression(replaceFirstAtom, refAtom);
             return _factory.Unary(_context, new SymbolRange(start, _tokenSource.StartIndex), UnaryOperation.ImplicitIntersection, refNode);
         }
@@ -611,6 +615,7 @@ public class FormulaParser<TScalarValue, TNode, TContext>
                 {
                     var start = _tokenSource.StartIndex;
                     Consume();
+                    EnsureStack();
                     var refExpression = RefExpression();
                     Match(Token.CLOSE_BRACE);
                     return _factory.Nested(_context, new SymbolRange(start, _tokenSource.StartIndex), refExpression);
@@ -1170,6 +1175,21 @@ public class FormulaParser<TScalarValue, TNode, TContext>
     private Exception Error(string message)
     {
         return new ParsingException($"Error at char {_tokenSource.StartIndex} of '{_input}': {message}");
+    }
+
+    /// <summary>
+    /// Make sure that the stack has space for one more nesting level of the formula.
+    /// </summary>
+    /// <remarks>
+    /// The parser calls itself for each nesting level, for example for parentheses, function
+    /// arguments and prefix operators. A stack overflow stops the process, and the caller cannot
+    /// catch it. Each recursion path of the parser calls this method. Thus a deep nesting gives
+    /// a <see cref="ParsingException"/> before the stack overflows.
+    /// </remarks>
+    private void EnsureStack()
+    {
+        if (!RuntimeHelpers.TryEnsureSufficientExecutionStack())
+            throw Error("The formula has too many nesting levels. The stack does not have sufficient space.");
     }
 
     /// <summary>
